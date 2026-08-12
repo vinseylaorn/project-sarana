@@ -1,0 +1,39 @@
+# ============================================
+.env
+.env.local
+.env.production
+.env.staging
+backend/.env
+
+# ============================================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# ============================================
+backend/vendor/
+backend/storage/logs/*.log
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/bootstrap/cache/
+
+# ============================================
+.DS_Store
+Thumbs.db
+node_modules/
+.next/
+
+# Backup files
+*.backup
+*.backup2
+*.backup3
+nginx/*.backup*
+
+# Certbot webroot verification folder (runtime only, not needed in repo)
+nginx/certbot-www/
+
+# Runtime/process files
+*.pid
+backend/supervisord.pid

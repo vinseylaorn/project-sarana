@@ -1,0 +1,18 @@
+// lib/api/index.ts
+
+export { authApi }                                                              from "./auth"
+export { usersApi }                                                             from "./users"
+export { rolesApi }                                                             from "./roles"
+export { staffApi }                                                             from "./staff"
+export { stockCategoriesApi, inventoryApi, stockHistoryApi, spoilageApi }      from "./inventory"
+export { suppliersApi }                                                         from "./suppliers"
+export { menuCategoriesApi, menuItemsApi }                                      from "./menu"
+export { ordersApi }                                                            from "./orders"
+export { tablesApi }                                                            from "./tables"
+export { financeCategoriesApi, expensesApi, incomesApi }                        from "./finance"
+export { reportsApi }                                                           from "./report"
+export { workingShiftsApi }                                                     from "./working-shifts"
+export { reservationsApi }                                                      from "./reservations"
+export { systemSettingApi }                                                     from "./setting"
+export { vipCardApi }                                                           from "./vipcard" 
+export { printerApi }                                                           from "./printer"

@@ -1,0 +1,51 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-pos}
+      MYSQL_USER: ${DB_USERNAME:-sarana}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-local-test}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-local-root}
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u "$$MYSQL_USER" "$$MYSQL_DATABASE" -e "SELECT 1"']
+      interval: 5s
+      timeout: 4s
+      retries: 40
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-pos}
+      DB_USERNAME: ${DB_USERNAME:-sarana}
+      DB_PASSWORD: ${DB_PASSWORD:-local-test}
+      APP_URL: http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - uploads:/var/www/html/storage/app/public
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api
+    environment:
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "127.0.0.1:3000:3000"
+  phpmyadmin:
+    image: phpmyadmin:5
+    environment:
+      PMA_HOST: db
+    ports:
+      - "127.0.0.1:8080:80"
+volumes:
+  mysql:
+  uploads:

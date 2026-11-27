@@ -1,31 +1,33 @@
+# Sarana restaurant management system
 
-- **Frontend:** Next.js
-- **Backend:** Laravel
-- **Database:** MySQL
-- **Infrastructure:** Docker
+## Run locally with Docker Compose
 
-## Getting Started
+From the repository root, prepare Laravel's environment on a fresh checkout:
 
-### Prerequisites
-- Docker & Docker Compose
+```sh
+cp -n backend/.env.example backend/.env
+```
 
-### Installation
+If `APP_KEY` in `backend/.env` is empty, generate a key with
+`openssl rand -base64 32` and set `APP_KEY=base64:<generated value>`.
 
-1. Clone the repo
-   git clone https://github.com/your-username/Restaurant-Management-System.git
+```sh
+docker compose up --build -d
+docker compose logs -f backend
+```
 
-2. Setup Backend environment
-   cp backend/.env.example backend/.env
+Laravel runs migrations during startup. On a **fresh test database**, initialize
+the demo administrator after migrations finish:
 
-3. Start all services
-   docker-compose up --build
+```sh
+docker compose exec backend php artisan db:seed --force
+```
 
-4. Run migrations
-   docker-compose exec backend php artisan migrate
+Open [the frontend](http://localhost:3000) and sign in with `supperadmin` and
+`password123` to test [role settings](http://localhost:3000/settings/role).
+Laravel listens on port 8000. [phpMyAdmin](http://localhost:8080) accepts the
+database credentials from the root `.env` (`DB_USERNAME` and `DB_PASSWORD`).
+Without overrides, these default to `sarana` and `local-test`.
 
-## Access
-| Service     | URL                   |
-|-------------|-----------------------|
-| Frontend    | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| phpMyAdmin  | http://localhost:8080 |
+Run `docker compose down` to stop the stack. Database data and uploads persist
+in named volumes.

@@ -3,41 +3,49 @@
 namespace App\Http\Controllers\Api\Report;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Services\ReportService;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class ReportController extends Controller
 {
-    public function dashboard(Request $request, ReportService $service)
-{
-    $validated = $request->validate([
-        'start_date' => ['nullable', 'date_format:Y-m-d'],
-        'end_date'   => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-    ]);
+    public function __construct(private ReportService $reportService) {}
 
-    \Log::info('Dashboard params', [
-        'start_date' => $validated['start_date'] ?? null,
-        'end_date'   => $validated['end_date']   ?? null,
-    ]);
-
-    $data = $service->dashboard(
-        $validated['start_date'] ?? null,
-        $validated['end_date']   ?? null,
-    );
-
-    return response()->json($data);
-}
-
-    public function export(Request $request, ReportService $service)
+    public function dashboard(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'start_date' => ['nullable', 'date_format:Y-m-d'],
-            'end_date'   => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-        ]);
+        $data = $this->reportService->dashboard(
+            $request->query('start_date'),
+            $request->query('end_date'),
+        );
 
-        $data = $service->exportOrders(
-            $validated['start_date'] ?? null,
-            $validated['end_date']   ?? null,
+        return response()->json($data);
+    }
+
+    public function export(Request $request): JsonResponse
+    {
+        $data = $this->reportService->exportOrders(
+            $request->query('start_date'),
+            $request->query('end_date'),
+        );
+
+        return response()->json($data);
+    }
+
+    public function shifts(Request $request): JsonResponse
+    {
+        $data = $this->reportService->shifts(
+            $request->query('start_date'),
+            $request->query('end_date'),
+        );
+
+        return response()->json($data);
+    }
+
+    public function inventory(Request $request): JsonResponse
+    {
+        $data = $this->reportService->inventoryReport(
+            $request->query('start_date'),
+            $request->query('end_date'),
         );
 
         return response()->json($data);

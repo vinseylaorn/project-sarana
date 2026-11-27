@@ -15,8 +15,8 @@ const iCls = [
   "dark:bg-[#13151f] dark:border-white/[0.10]",
   "dark:text-white dark:placeholder:text-white/25",
   "dark:shadow-none",
-  "focus:border-[#1857D8]/50 focus:ring-2 focus:ring-[#1857D8]/15",
-  "dark:focus:border-[#1857D8]/60 dark:focus:ring-[#1857D8]/10",
+  "focus:border-[#03624C] focus:ring-2 focus:ring-[#03624C]/15",
+  "dark:focus:border-[#03624C] dark:focus:ring-[#03624C]/25",
   "disabled:opacity-50 disabled:cursor-not-allowed",
 ].join(" ")
 
@@ -99,14 +99,14 @@ export function AdminLoginScreen({
   }, [adminErr, externalLoading])
 
   const t = {
-    back:       isKh ? "ត្រឡប់"                   : "Back",
-    userLbl:    isKh ? "ឈ្មោះអ្នកប្រើ ឬអ៊ីម៉ែល"  : "Username or Email",
-    userPh:     isKh ? "បញ្ចូលឈ្មោះ ឬអ៊ីម៉ែល"   : "Enter username or email",
-    passLbl:    isKh ? "លេខសម្ងាត់"               : "Password",
-    passPh:     isKh ? "បញ្ចូលលេខសម្ងាត់"        : "Enter password",
-    forgot:     isKh ? "ភ្លេចលេខសម្ងាត់?"        : "Forgot password?",
-    signin:     isKh ? "ចូលប្រព័ន្ធ"              : "Sign in",
-    signingIn:  isKh ? "កំពុងចូល..."              : "Signing in...",
+    back: isKh ? "ត្រឡប់" : "Back",
+    userLbl: isKh ? "ឈ្មោះអ្នកប្រើ ឬអ៊ីម៉ែល" : "Username or Email",
+    userPh: isKh ? "បញ្ចូលឈ្មោះ ឬអ៊ីម៉ែល" : "Enter username or email",
+    passLbl: isKh ? "លេខសម្ងាត់" : "Password",
+    passPh: isKh ? "បញ្ចូលលេខសម្ងាត់" : "Enter password",
+    forgot: isKh ? "ភ្លេចលេខសម្ងាត់?" : "Forgot password?",
+    signin: isKh ? "ចូលប្រព័ន្ធ" : "Sign in",
+    signingIn: isKh ? "កំពុងចូល..." : "Signing in...",
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,31 +128,33 @@ export function AdminLoginScreen({
   return (
     <Shell>
       <BackBtn onBack={onBack} label={t.back} disabled={isLoading} />
-      <div className="flex items-center justify-center gap-3.5">
+      <div className="flex items-center justify-center gap-3.5 mb-6">
         <Logo />
         <div>
           <p className="text-[16px] font-bold text-gray-900 dark:text-white">Admin Login</p>
           <p className="text-[12px] text-gray-500 dark:text-white/30">{systemName}</p>
         </div>
       </div>
-      <div className="min-h-[44px] mb-2">
-        <AnimatePresence>
-          {adminErr && (
-            <motion.div
-              key="err"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg
-                bg-rose-50 dark:bg-rose-500/10
-                border border-rose-200 dark:border-rose-500/20" >
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-              <p className="text-[12px] font-semibold text-rose-600 dark:text-rose-400">{adminErr}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      <AnimatePresence initial={false}>
+        {adminErr && (
+          <motion.div
+            key="err"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden" >
+            <div className="flex items-center gap-2.5 px-4 py-3 mb-4 rounded-xl
+              bg-rose-50 dark:bg-rose-500/10
+              border border-rose-200 dark:border-rose-500/20">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+              <p className="text-[13px] font-semibold text-rose-600 dark:text-rose-400 leading-snug">
+                {adminErr}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
         <div className="space-y-1.5">
           <label className="text-[14px] font-medium text-gray-600 dark:text-white/30 block">

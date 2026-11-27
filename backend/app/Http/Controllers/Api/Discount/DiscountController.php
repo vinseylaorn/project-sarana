@@ -26,7 +26,7 @@ class DiscountController extends Controller
         $request->validate([
             'name'             => 'required|string|max:255',
             'scope'            => 'required|in:category,product',
-            'value_type'       => 'required|in:percentage,flat',
+            'value_type'       => 'required|in:percentage,amount',
             'value'            => 'required|numeric|min:0',
             'target_ids'       => 'required|array|min:1',
             'target_ids.*'     => 'required|integer|min:1',
@@ -67,7 +67,7 @@ class DiscountController extends Controller
         $request->validate([
             'name'             => 'sometimes|string|max:255',
             'scope'            => 'sometimes|in:category,product',
-            'value_type'       => 'sometimes|in:percentage,flat',
+            'value_type'       => 'sometimes|in:percentage,amount',
             'value'            => 'sometimes|numeric|min:0',
             'target_ids'       => 'sometimes|array|min:1',
             'target_ids.*'     => 'required_with:target_ids|integer|min:1',

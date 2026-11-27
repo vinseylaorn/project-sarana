@@ -38,7 +38,7 @@ export const TAB_BASE =
   "border-gray-200 dark:border-white/[0.10] text-gray-500 dark:text-white/45 bg-white dark:bg-[#22263a]"
 
 export const TAB_ACTIVE =
-  "bg-[#03624C]/10 dark:bg-[#1857D8]/20 border-[#03624C]/5 dark:border-[#1857D8]/5 text-[#03624C] dark:text-violet-300"
+  "bg-[#03624C] dark:bg-[#1857D8]/20 border-[#03624C]/5 dark:border-[#1857D8]/5 text-white dark:text-violet-300"
 
 export type DialogMode = "add" | "edit" | "view"
 

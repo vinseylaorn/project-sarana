@@ -11,9 +11,9 @@ import { LogOut } from "lucide-react"
 const SORA: React.CSSProperties = { fontFamily: "'Sora', sans-serif" }
 
 interface LogoutDialogProps {
-  open:         boolean
+  open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm:    () => void
+  onConfirm: () => void
 }
 
 export function LogoutDialog({ open, onOpenChange, onConfirm }: LogoutDialogProps) {
@@ -24,9 +24,8 @@ export function LogoutDialog({ open, onOpenChange, onConfirm }: LogoutDialogProp
       <AlertDialogContent
         className="rounded-2xl border-0 bg-white dark:bg-[#22263a] shadow-2xl p-0 max-w-[400px] overflow-hidden"
         style={SORA} >
-        <div className="h-1 w-full bg-gradient-to-r from-[#03624C] to-[#059669] dark:from-[#1857D8] dark:to-[#1857D8]/60" />
-          <div className="p-6">
-            <div className="flex items-start gap-4 mb-4">
+        <div className="p-6">
+          <div className="flex items-start gap-4 mb-4">
             <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-[#03624C]/[0.08] 
               border border-[#03624C]/20 dark:bg-[#1857D8]/[0.12] dark:border-[#1857D8]/25" >
               <LogOut className="w-5 h-5 text-[#03624C] dark:text-[#6b9fff]" />

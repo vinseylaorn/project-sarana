@@ -7,6 +7,7 @@ use App\Models\MenuItem;
 use App\Models\RestaurantTable;
 use App\Models\Reservation;
 use App\Models\Discount;
+use App\Services\TelegramService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,13 @@ class ReservationController extends Controller
     private const LOCK_WINDOW_MINUTES = 30;
 
     private const MIN_GAP_MINUTES = 90;
+
+    protected TelegramService $telegram;
+
+    public function __construct(TelegramService $telegram)
+    {
+        $this->telegram = $telegram;
+    }
 
     private function getActiveDiscounts(): \Illuminate\Support\Collection
     {
@@ -220,6 +228,10 @@ class ReservationController extends Controller
             }
 
             DB::commit();
+
+            // ✅ Telegram alert — sent after commit so a slow/failed HTTP
+            // call to Telegram never rolls back or blocks the DB transaction.
+            $this->telegram->sendReservationNotification($reservation->load(['tables', 'items']));
 
             return response()->json([
                 'message'     => 'Reservation created successfully.',

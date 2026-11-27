@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import React, { useState, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 import type { Expense } from "@/types"
 import { usePermission } from "@/lib/role-context"
+import { useSettings } from "@/lib/settings-context"
 import { toastSuccess, toastError, toastWarn } from "@/lib/toast"
 import { DateRangePicker } from "@/components/ui/DateRangePicker"
 import { DatePicker } from "@/components/ui/DatePicker"
@@ -103,11 +104,12 @@ function formatCompact(value: number): string {
 }
 
 function KpiCard({
-   label, value, sub, style, icon: Icon, delay,
+   label, value, sub, prefix, style, icon: Icon, delay,
 }: {
    label: string
    value: number
    sub?: string
+   prefix: string
    style: typeof KPI.total
    icon: React.ElementType
    delay: number
@@ -131,8 +133,8 @@ function KpiCard({
                </div>
                <p
                   className={cn("text-[22px] font-bold text-center leading-none tabular-nums mb-2.5", style.text)}
-                  title={`$${value.toFixed(2)}`} >
-                  ${formatCompact(value)}
+                  title={`${prefix}${value.toFixed(2)}`} >
+                  {prefix}{formatCompact(value)}
                </p>
                {sub && (
                   <div className="flex items-center gap-1.5">
@@ -148,7 +150,10 @@ function KpiCard({
 export default function ExpensePage() {
    const { t, i18n } = useTranslation("common")
    const isKh = i18n.language === "kh"
-   const { can } = usePermission("finance")
+   // FIX: ប្រើ key "expense" (role-context ធ្លាក់ទៅ "finance" ស្វ័យប្រវត្តិបើគ្មាន key expense)
+   const { can } = usePermission("expense")
+   const settings = useSettings()
+   const cur = (settings as any).currencySymbol || (settings as any).currency || "$"
 
    const {
       data: expenseList = [],
@@ -201,7 +206,7 @@ export default function ExpensePage() {
    )
 
    const resetFilters = () => {
-      setSearch(""); setCategoryFilter("all"); setStartDate(""); setEndDate("")
+      setSearch(""); setCategoryFilter("all"); setStartDate(""); setEndDate(""); setCurrentPage(1)
    }
    const hasFilter = search || startDate || endDate || categoryFilter !== "all"
 
@@ -268,7 +273,7 @@ export default function ExpensePage() {
          }
          setIsDialogOpen(false)
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
       }
    }
 
@@ -284,8 +289,7 @@ export default function ExpensePage() {
          )
          setIsDeleteAlertOpen(false); setItemToDelete(null)
       } catch (err: any) {
-         toastError(err?.message ?? (
-            isKh ? "លុបមិនបាន" : "Failed to delete"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "លុបមិនបាន" : "Failed to delete"))
       }
    }
 
@@ -355,7 +359,7 @@ export default function ExpensePage() {
          key: "amount", sortable: true, header: isKh ? "ទឹកប្រាក់" : "Amount",
          render: (item: any) => (
             <span className="text-rose-600 dark:text-rose-400 text-[14px]">
-               -${Number(item.amount).toFixed(2)}
+               -{cur}{Number(item.amount).toFixed(2)}
             </span>
          ),
       },
@@ -364,7 +368,7 @@ export default function ExpensePage() {
          header: isKh ? "សកម្មភាព" : "Action",
          className: "text-right",
          render: (item: any) => {
-            const isAuto = item.isAuto || item.is_auto;
+            const isAuto = item.isAuto || item.is_auto
             return (
                <div className="flex items-center justify-end gap-1.5">
                   <button
@@ -405,7 +409,7 @@ export default function ExpensePage() {
                      </button>
                   )}
                </div>
-            );
+            )
          },
       },
    ]
@@ -443,25 +447,25 @@ export default function ExpensePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
                      <KpiCard
                         label={isKh ? "ចំណាយសរុប" : "Total Expense"}
-                        value={totalExpense}
+                        value={totalExpense} prefix={cur}
                         style={KPI.total} icon={TrendingDown} delay={0}
                         sub={`${expenseList.length} ${isKh ? "កំណត់ត្រា" : "records"}`}
                      />
                      <KpiCard
                         label={isKh ? "ចំណាយថ្ងៃនេះ" : "Today Expense"}
-                        value={todayExpense}
+                        value={todayExpense} prefix={cur}
                         style={KPI.today} icon={Sun} delay={0.07}
                         sub={isKh ? "នៅថ្ងៃនេះ" : "spent today"}
                      />
                      <KpiCard
                         label={isKh ? "ចំណាយត្រងបាន" : "Filtered Total"}
-                        value={filteredData.reduce((s: number, i: Expense) => s + Number(i.amount), 0)}
+                        value={filteredData.reduce((s: number, i: Expense) => s + Number(i.amount), 0)} prefix={cur}
                         style={KPI.rose} icon={Filter} delay={0.14}
                         sub={`${filteredData.length} ${isKh ? "លទ្ធផល" : "results"}`}
                      />
                      <KpiCard
                         label={isKh ? "មធ្យមចំណាយ" : "Avg per Record"}
-                        value={avgExpense}
+                        value={avgExpense} prefix={cur}
                         style={KPI.avg} icon={DollarSign} delay={0.21}
                         sub={isKh ? "ជាមធ្យម" : "average value"}
                      />
@@ -477,11 +481,11 @@ export default function ExpensePage() {
                               className={cn(INPUT, "w-56 pl-8")}
                               placeholder={isKh ? "ស្វែងរក..." : "Search..."}
                               value={search}
-                              onChange={e => setSearch(e.target.value)}
+                              onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
                            />
                         </div>
                         <div className="h-5 w-px bg-gray-200 dark:bg-white/[0.07] shrink-0" />
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <Select value={categoryFilter} onValueChange={v => { setCategoryFilter(v); setCurrentPage(1) }}>
                            <SelectTrigger className={cn(SEL_T, "w-44")}>
                               <Filter className={cn("w-3.5 h-3.5 mr-1.5 shrink-0", ACCENT.text)} />
                               <SelectValue />
@@ -495,7 +499,8 @@ export default function ExpensePage() {
                         </Select>
                         <DateRangePicker
                            startDate={startDate} endDate={endDate}
-                           onStartChange={setStartDate} onEndChange={setEndDate}
+                           onStartChange={v => { setStartDate(v); setCurrentPage(1) }}
+                           onEndChange={v => { setEndDate(v); setCurrentPage(1) }}
                         />
                         <AnimatePresence>
                            {hasFilter && (

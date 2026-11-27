@@ -6,6 +6,8 @@ use App\Models\Order;
 use App\Models\Income;
 use App\Models\Expense;
 use App\Models\MenuCategory;
+use App\Models\Inventory;
+use App\Models\StockHistory;
 use Illuminate\Support\Carbon;
 
 class ReportService
@@ -185,7 +187,8 @@ class ReportService
                 'topItems'       => $topItems,
                 'paymentData'    => $paymentData,
             ],
-            'recent' => $recent,
+            'recent'    => $recent,
+            'inventory' => $this->inventorySummary(),
         ];
     }
 
@@ -212,5 +215,104 @@ class ReportService
             'payment_method' => $o->payment_method ?? '-',
             'created_at'     => Carbon::parse($o->created_at)->timezone(self::TZ)->format('Y-m-d H:i:s'),
         ])->values()->toArray();
+    }
+
+    // ─── Inventory summary (used inside dashboard()) ──────────────────────
+    public function inventorySummary(): array
+    {
+        $items = Inventory::all();
+        $total = $items->count();
+        $low   = $items->filter(fn($i) => $i->stock > 0 && $i->stock <= $i->min_stock)->count();
+        $out   = $items->where('stock', 0)->count();
+
+        return [
+            'totalProducts' => $total,
+            'goodStock'     => $total - $low - $out,
+            'lowStock'      => $low,
+            'outStock'      => $out,
+        ];
+    }
+
+    // ─── Full Inventory Report page ────────────────────────────────────────
+    public function inventoryReport($startDate = null, $endDate = null): array
+    {
+        $items = Inventory::with(['category', 'supplier'])->get();
+
+        $total = $items->count();
+        $low   = $items->filter(fn($i) => $i->stock > 0 && $i->stock <= $i->min_stock)->count();
+        $out   = $items->where('stock', 0)->count();
+
+        $stockByCategory = $items->groupBy(fn($i) => $i->category?->name ?? 'Uncategorized')
+            ->map(fn($g, $name) => [
+                'name'  => $name,
+                'count' => $g->count(),
+                'stock' => (float) $g->sum('stock'),
+            ])
+            ->values();
+
+        $history = StockHistory::query()
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+            ->when($endDate,   fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->get();
+
+        $now = Carbon::now(self::TZ);
+        $movementTrend = collect(range(6, 0))->map(function ($i) use ($now, $history) {
+            $date = $now->copy()->subDays($i)->toDateString();
+            $day  = $history->filter(fn($h) => Carbon::parse($h->created_at)->timezone(self::TZ)->toDateString() === $date);
+            return [
+                'label' => Carbon::parse($date)->format('M j'),
+                'in'    => (float) $day->where('type', 'IN')->sum('qty'),
+                'out'   => (float) $day->where('type', 'OUT')->sum('qty'),
+            ];
+        })->values();
+
+        $lowStockItems = $items->filter(fn($i) => $i->stock <= $i->min_stock)
+            ->sortBy('stock')->take(10)
+            ->map(fn($i) => [
+                'id'        => $i->id,
+                'name'      => $i->name,
+                'category'  => $i->category?->name,
+                'stock'     => $i->stock,
+                'min_stock' => $i->min_stock,
+                'unit'      => $i->unit,
+                'supplier'  => $i->supplier?->name,
+            ])->values();
+
+        $topRestocked = $history->where('type', 'IN')->groupBy('product_name')
+            ->map(fn($g, $n) => ['name' => $n, 'qty' => (float) $g->sum('qty')])
+            ->sortByDesc('qty')->take(5)->values();
+
+        $topConsumed = $history->where('type', 'OUT')->groupBy('product_name')
+            ->map(fn($g, $n) => ['name' => $n, 'qty' => (float) $g->sum('qty')])
+            ->sortByDesc('qty')->take(5)->values();
+
+        $recentMovements = $history->sortByDesc('created_at')->take(10)->map(fn($h) => [
+            'id'           => $h->id,
+            'product_name' => $h->product_name,
+            'type'         => $h->type,
+            'qty'          => $h->qty,
+            'unit'         => $h->unit,
+            'reason'       => $h->reason,
+            'created_at'   => $h->created_at->toISOString(),
+        ])->values();
+
+        return [
+            'kpi' => [
+                'totalProducts' => $total,
+                'goodStock'     => $total - $low - $out,
+                'lowStock'      => $low,
+                'outStock'      => $out,
+                'totalIn'       => (float) $history->where('type', 'IN')->sum('qty'),
+                'totalOut'      => (float) $history->where('type', 'OUT')->sum('qty'),
+            ],
+            'charts' => [
+                'stockByCategory' => $stockByCategory,
+                'movementTrend'   => $movementTrend,
+                'topRestocked'    => $topRestocked,
+                'topConsumed'     => $topConsumed,
+            ],
+            'lowStockItems'   => $lowStockItems,
+            'recentMovements' => $recentMovements,
+        ];
     }
 }

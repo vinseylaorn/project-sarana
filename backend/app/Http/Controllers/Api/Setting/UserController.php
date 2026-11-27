@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
@@ -39,7 +40,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name'     => 'required|string|max:80',
             'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
+            'password' => ['required', 'string', $this->strongPassword()],
             'role_id'  => 'nullable|exists:roles,id',
             'status'   => 'nullable|in:Active,Inactive',
             'image'    => 'nullable|string',
@@ -66,7 +67,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name'     => 'sometimes|string|max:80',
             'email'    => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => 'sometimes|nullable|string|min:6',
+            'password' => ['sometimes', 'nullable', 'string', $this->strongPassword()],
             'role_id'  => 'nullable|exists:roles,id',
             'status'   => 'nullable|in:Active,Inactive',
             'image'    => 'nullable|string',
@@ -134,6 +135,19 @@ class UserController extends Controller
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Strong password: min 8 chars, upper + lower case, number, symbol.
+     * Add ->uncompromised() to also reject leaked passwords (needs internet).
+     */
+    private function strongPassword(): Password
+    {
+        return Password::min(8)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols();
     }
 
     private function format(User $user, bool $withPermissions = false): array

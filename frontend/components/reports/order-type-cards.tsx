@@ -50,12 +50,14 @@ export function OrderTypeCards({ dineIn, takeaway, app, totalOrders }: OrderType
       text: "text-[#1857D8] dark:text-[#1857D8]",
     },
   ]
+
   return (
     <motion.div
       variants={staggerContainer}
       initial="hidden"
       animate="show"
-      className="grid grid-cols-3 gap-4" >
+      className="grid grid-cols-3 gap-4"
+    >
       {items.map((item) => {
         const pct = totalOrders > 0 ? Math.round((item.val / totalOrders) * 100) : 0
         return (
@@ -63,7 +65,8 @@ export function OrderTypeCards({ dineIn, takeaway, app, totalOrders }: OrderType
             key={item.label}
             variants={staggerChild}
             whileHover={{ y: -2 }}
-            className="bg-white dark:bg-[#1a1d2e] border border-gray-200 dark:border-white/[0.07] shadow-sm dark:shadow-none rounded-lg p-4 flex flex-col gap-3" >
+            className="bg-white dark:bg-[#1a1d2e] border border-gray-200 dark:border-white/[0.07] shadow-sm dark:shadow-none rounded-lg p-4 flex flex-col gap-3"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-lg leading-none">{item.icon}</span>
@@ -75,7 +78,7 @@ export function OrderTypeCards({ dineIn, takeaway, app, totalOrders }: OrderType
                 <p className="text-[22px] font-black text-gray-800 dark:text-white leading-none">
                   {item.val.toLocaleString()}
                 </p>
-                <span className="text-[13px] font-bold text-gray-600 dark:text-white/30">
+                <span className="text-[14px] font-bold text-gray-600 dark:text-white/30">
                   {isKh ? "កម្ម៉ង់" : "orders"}
                 </span>
               </div>
@@ -89,11 +92,11 @@ export function OrderTypeCards({ dineIn, takeaway, app, totalOrders }: OrderType
                   transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
                 />
               </div>
-              <span className={cn("text-[13px] font-black shrink-0", item.text)}>
+              <span className={cn("text-[14px] font-black shrink-0", item.text)}>
                 {pct}%
               </span>
             </div>
-            <p className="text-[13px] text-gray-500 dark:text-white/25 font-medium -mt-1">
+            <p className="text-[14px] text-gray-500 dark:text-white/25 font-medium -mt-1">
               {isKh
                 ? `នៃការកម្ម៉ង់សរុប ${totalOrders}`
                 : `of ${totalOrders} total orders`}

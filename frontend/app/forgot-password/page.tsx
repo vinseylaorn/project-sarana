@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { Mail, ArrowLeft, Loader2, KeyRound, Send, Lock, Eye, EyeOff, CheckCircle, AlertTriangle } from "lucide-react"
+import { Mail, ArrowLeft, Loader2, KeyRound, Send, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/lib/settings-context"
 import { useTranslation } from "react-i18next"
@@ -20,6 +20,8 @@ const inputCls = [
   "disabled:opacity-50 disabled:cursor-not-allowed",
 ].join(" ")
 
+const inputErrCls = "border-rose-400 dark:border-rose-500/50 focus:border-rose-400 dark:focus:border-rose-500/50"
+
 const stepAnim = {
   initial: { opacity: 0, x: 24, filter: "blur(3px)" },
   animate: { opacity: 1, x: 0, filter: "blur(0px)" },
@@ -27,6 +29,7 @@ const stepAnim = {
   transition: { duration: 0.28, ease: "easeOut" as const },
 }
 
+// Banner error (used for general / step 1 & 2 errors)
 const ErrMsg = ({ msg }: { msg: string }) => (
   <motion.div
     initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
@@ -38,6 +41,17 @@ const ErrMsg = ({ msg }: { msg: string }) => (
   </motion.div>
 )
 
+// Inline error shown directly under a field
+const FieldErr = ({ msg }: { msg: string }) => (
+  <motion.p
+    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.18 }}
+    className="flex items-center gap-1 text-[12px] text-rose-500 dark:text-rose-400 mt-1 font-medium"
+  >
+    <AlertTriangle className="w-3 h-3 shrink-0" />{msg}
+  </motion.p>
+)
+
 const btnCls = [
   "w-full h-11 rounded-lg text-[13px] font-semibold transition-all",
   "bg-[#1857D8] hover:bg-[#1449b8] text-white shadow-md shadow-[#1857D8]/25",
@@ -46,6 +60,76 @@ const btnCls = [
   "disabled:opacity-60 disabled:cursor-not-allowed",
   "flex items-center justify-center gap-2",
 ].join(" ")
+
+// ─── Strong password ──────────────────────────────────────────────
+const PASSWORD_RULES = [
+  { id: "len", test: (p: string) => p.length >= 8, en: "At least 8 characters", kh: "យ៉ាងតិច 8 តួអក្សរ" },
+  { id: "lower", test: (p: string) => /[a-z]/.test(p), en: "One lowercase letter (a-z)", kh: "អក្សរតូច (a-z)" },
+  { id: "upper", test: (p: string) => /[A-Z]/.test(p), en: "One uppercase letter (A-Z)", kh: "អក្សរធំ (A-Z)" },
+  { id: "num", test: (p: string) => /\d/.test(p), en: "One number (0-9)", kh: "លេខ (0-9)" },
+  { id: "sym", test: (p: string) => /[^A-Za-z0-9]/.test(p), en: "One symbol (!@#$%...)", kh: "និមិត្តសញ្ញា (!@#$%...)" },
+]
+
+const isStrongPassword = (p: string) => PASSWORD_RULES.every(r => r.test(p))
+
+const PasswordStrength = ({ password, isKh, hasError }: { password: string; isKh: boolean; hasError?: boolean }) => {
+  if (!password) return null
+  const passed = PASSWORD_RULES.filter(r => r.test(password)).length
+  const level =
+    passed <= 2 ? { label: isKh ? "ខ្សោយ" : "Weak", color: "bg-rose-500", text: "text-rose-500" }
+      : passed <= 4 ? { label: isKh ? "មធ្យម" : "Medium", color: "bg-amber-500", text: "text-amber-500" }
+        : { label: isKh ? "រឹងមាំ" : "Strong", color: "bg-emerald-500", text: "text-emerald-500" }
+
+  return (
+    <div className={cn(
+      "space-y-2 rounded-lg border p-3 transition-colors",
+      hasError
+        ? "border-rose-300 dark:border-rose-500/40 bg-rose-50/60 dark:bg-rose-500/[0.06]"
+        : "border-gray-100 dark:border-white/[0.08] bg-gray-50/70 dark:bg-white/[0.03]"
+    )}>
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-1">
+          {PASSWORD_RULES.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-1.5 flex-1 rounded-full transition-colors",
+                i < passed ? level.color : "bg-gray-200 dark:bg-white/10"
+              )}
+            />
+          ))}
+        </div>
+        <span className={cn("text-[12px] font-bold", level.text)}>{level.label}</span>
+      </div>
+      <ul className="grid grid-cols-1 gap-1">
+        {PASSWORD_RULES.map(r => {
+          const ok = r.test(password)
+          return (
+            <li key={r.id} className={cn(
+              "flex items-center gap-1.5 text-[12px] transition-colors",
+              ok
+                ? "text-emerald-600 dark:text-emerald-400"
+                : hasError
+                  ? "text-rose-500 dark:text-rose-400 font-medium"
+                  : "text-gray-500 dark:text-white/30"
+            )}>
+              {ok ? <Check className="w-3 h-3 shrink-0" /> : <X className="w-3 h-3 shrink-0" />}
+              {isKh ? r.kh : r.en}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+class ApiError extends Error {
+  errors?: Record<string, string[]>
+  constructor(message: string, errors?: Record<string, string[]>) {
+    super(message)
+    this.errors = errors
+  }
+}
 
 export default function ForgotPasswordPage() {
   const { systemName } = useSettings()
@@ -61,6 +145,7 @@ export default function ForgotPasswordPage() {
   const [showConf, setShowConf] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<{ new?: string; confirm?: string }>({})
   const [resendCooldown, setResendCooldown] = useState(0)
 
   const clearError = () => setError("")
@@ -75,9 +160,9 @@ export default function ForgotPasswordPage() {
     if (!res.ok) {
       if (data.errors) {
         const first = Object.values(data.errors as Record<string, string[]>)[0]?.[0]
-        throw new Error(first ?? data.message ?? "Error")
+        throw new ApiError(first ?? data.message ?? "Error", data.errors)
       }
-      throw new Error(data.message ?? "Error")
+      throw new ApiError(data.message ?? "Error")
     }
     return data
   }
@@ -99,16 +184,37 @@ export default function ForgotPasswordPage() {
   }
 
   const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault(); clearError()
-    if (!newPass || !confirmPass) { setError(isKh ? "សូមបញ្ចូលគ្រប់ field ទាំងអស់" : "All fields are required"); return }
-    if (newPass.length < 6) { setError(isKh ? "លេខសម្ងាត់ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ" : "Password must be at least 6 characters"); return }
-    if (newPass !== confirmPass) { setError(isKh ? "លេខសម្ងាត់មិនត្រូវគ្នា" : "Passwords do not match"); return }
+    e.preventDefault(); clearError(); setFieldErrors({})
+
+    const fe: { new?: string; confirm?: string } = {}
+    if (!newPass)
+      fe.new = isKh ? "សូមបញ្ចូលលេខសម្ងាត់ថ្មី" : "New password is required"
+    else if (!isStrongPassword(newPass))
+      fe.new = isKh
+        ? "លេខសម្ងាត់មិនទាន់រឹងមាំគ្រប់គ្រាន់ សូមបំពេញលក្ខខណ្ឌទាំងអស់"
+        : "Password is not strong enough. Please meet all requirements."
+
+    if (!confirmPass)
+      fe.confirm = isKh ? "សូមបញ្ជាក់លេខសម្ងាត់ថ្មី" : "Please confirm your new password"
+    else if (newPass && newPass !== confirmPass)
+      fe.confirm = isKh ? "លេខសម្ងាត់មិនត្រូវគ្នា" : "Passwords do not match"
+
+    if (Object.keys(fe).length > 0) { setFieldErrors(fe); return }
+
     setIsLoading(true)
     try {
       await apiPost("/forgot-password/reset", { email, otp, new_password: newPass, new_password_confirmation: confirmPass })
       setStep(4)
     }
-    catch (err: any) { setError(err.message) }
+    catch (err: any) {
+      if (err instanceof ApiError && err.errors) {
+        const e2 = err.errors
+        setFieldErrors({ new: e2.new_password?.[0], confirm: e2.new_password_confirmation?.[0] })
+        if (!e2.new_password && !e2.new_password_confirmation) setError(err.message)
+      } else {
+        setError(err.message)
+      }
+    }
     finally { setIsLoading(false) }
   }
 
@@ -271,34 +377,45 @@ export default function ForgotPasswordPage() {
             {step === 3 && (
               <motion.form key="step3" {...stepAnim} onSubmit={handleReset} className="px-8 pb-8 space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-white/40">
+                  <label className={cn(
+                    "text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-white/40",
+                    fieldErrors.new && "text-rose-500 dark:text-rose-400"
+                  )}>
                     {isKh ? "លេខសម្ងាត់ថ្មី" : "New Password"}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-white/20" />
-                    <input type={showPass ? "text" : "password"} className={cn(inputCls, "pl-10 pr-11")}
-                      placeholder={isKh ? "យ៉ាងហោចណាស់ ៦ តួអក្សរ" : "At least 6 characters"} value={newPass}
-                      onChange={e => { setNewPass(e.target.value); clearError() }} disabled={isLoading} />
+                    <input type={showPass ? "text" : "password"}
+                      className={cn(inputCls, "pl-10 pr-11", fieldErrors.new && inputErrCls)}
+                      placeholder={isKh ? "យ៉ាងហោចណាស់ ៨ តួអក្សរ" : "At least 8 characters"} value={newPass}
+                      onChange={e => { setNewPass(e.target.value); setFieldErrors(p => ({ ...p, new: undefined })); clearError() }} disabled={isLoading} />
                     <button type="button" onClick={() => setShowPass(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition-colors">
                       {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                  {fieldErrors.new && <FieldErr msg={fieldErrors.new} />}
+                  <PasswordStrength password={newPass} isKh={isKh} hasError={!!fieldErrors.new} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-white/40">
+                  <label className={cn(
+                    "text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-white/40",
+                    fieldErrors.confirm && "text-rose-500 dark:text-rose-400"
+                  )}>
                     {isKh ? "បញ្ជាក់លេខសម្ងាត់" : "Confirm Password"}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-white/20" />
-                    <input type={showConf ? "text" : "password"} className={cn(inputCls, "pl-10 pr-11")}
+                    <input type={showConf ? "text" : "password"}
+                      className={cn(inputCls, "pl-10 pr-11", fieldErrors.confirm && inputErrCls)}
                       placeholder={isKh ? "បញ្ជាក់លេខសម្ងាត់ម្តងទៀត" : "Confirm your new password"} value={confirmPass}
-                      onChange={e => { setConfirm(e.target.value); clearError() }} disabled={isLoading} />
+                      onChange={e => { setConfirm(e.target.value); setFieldErrors(p => ({ ...p, confirm: undefined })); clearError() }} disabled={isLoading} />
                     <button type="button" onClick={() => setShowConf(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition-colors">
                       {showConf ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                  {fieldErrors.confirm && <FieldErr msg={fieldErrors.confirm} />}
                 </div>
                 {error && <ErrMsg msg={error} />}
                 <motion.button type="submit" whileTap={{ scale: 0.98 }} disabled={isLoading || !newPass || !confirmPass}

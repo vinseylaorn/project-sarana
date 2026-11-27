@@ -14,8 +14,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DateRangePicker } from "@/components/ui/DateRangePicker"
 import {
-   Search, Eye, Trash2, Loader2, RotateCcw, Clock, Filter, RefreshCw, Sparkles,
-   Timer, CalendarDays, ShoppingBag, TrendingUp, CheckCircle2, AlertCircle,
+   Search, Eye, Trash2, Loader2, RotateCcw, Clock, Filter, RefreshCw,
+   Timer, CalendarDays, ShoppingBag, TrendingUp, CheckCircle2, AlertCircle, AlertTriangle, Wallet,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -48,12 +48,74 @@ const INPUT =
    "focus:border-[#03624C] dark:focus:border-[#4dab8e] focus:ring-2 focus:ring-[#03624C]/10 " +
    "dark:focus:ring-[#4dab8e]/10 shadow-sm dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
 
+// Only used to DISPLAY the KHR line when the backend sends no KHR value.
+// It is NOT used for variance any more.
 const KHR_RATE = 4100
 
 const fmt_usd = (v: number) =>
    "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmt_khr = (v: number) =>
    "៛" + Math.round(v).toLocaleString("en-US")
+
+/**
+ * Variance now comes from the POS.
+ * When a shift is closed in the POS, the backend saves:
+ *   expected_cash_usd   = open cash + CASH-only revenue (rate from System Settings)
+ *   cash_difference_usd = actual close cash - expected
+ * We only read those values, so this page always matches the POS close-shift screen.
+ *
+ * Returns null when the shift is open, or was closed before the POS saved these values
+ * (we do NOT guess, because a guessed number would be wrong).
+ */
+const getVariance = (s: WorkingShift) => {
+   if (s.shift_status !== "Closed") return null
+   const a = s as any
+   if (a.expected_cash_usd == null || a.cash_difference_usd == null) return null
+
+   const expected = Number(a.expected_cash_usd)
+
+   // Expected cash can never be 0 when the drawer was opened with money in it
+   // (expected = opening float + cash sales). A 0 means the backend did not save
+   // the reconciliation (column default), so show "—" instead of a fake "Balanced".
+   const hadOpeningCash = (Number(s.open_amount_usd) || 0) > 0 || (Number(s.open_amount_khr) || 0) > 0
+   if (expected <= 0 && hadOpeningCash) return null
+
+   const diff = Math.round(Number(a.cash_difference_usd) * 100) / 100
+   const actual = Math.round((expected + diff) * 100) / 100
+   return { expected, actual, diff }
+}
+
+function VarianceBadge({ item, isKh }: { item: WorkingShift; isKh: boolean }) {
+   const v = getVariance(item)
+   if (!v) {
+      return (
+         <span
+            className="text-[14px] text-gray-300 dark:text-white/20"
+            title={item.shift_status === "Closed"
+               ? (isKh ? "គ្មានទិន្នន័យផ្ទៀងផ្ទាត់ (បិទមុនមានមុខងារនេះ)" : "No reconciliation data (closed before this feature)")
+               : undefined}
+         >—</span>
+      )
+   }
+
+   const isShort = v.diff < 0
+   const isOver = v.diff > 0
+   return (
+      <div className={cn(
+         "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold border",
+         isShort && "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/30",
+         isOver && "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/30",
+         !isShort && !isOver && "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+      )}>
+         {isShort || isOver ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+         {isShort
+            ? `${isKh ? "ខ្វះ" : "Short"} ${fmt_usd(Math.abs(v.diff))}`
+            : isOver
+               ? `${isKh ? "លើស" : "Over"} ${fmt_usd(v.diff)}`
+               : (isKh ? "ត្រឹមត្រូវ" : "Balanced")}
+      </div>
+   )
+}
 
 function AmountCell({ usd, khr }: { usd: number; khr?: number }) {
    return (
@@ -85,6 +147,7 @@ export default function WorkingShiftPage() {
    const [search, setSearch] = useState("")
    const [statusFilter, setStatusFilter] = useState("all")
    const [shiftFilter, setShiftFilter] = useState("all")
+   const [varianceFilter, setVarianceFilter] = useState("all")
    const [startDate, setStartDate] = useState("")
    const [endDate, setEndDate] = useState("")
    const [currentPage, setCurrentPage] = useState(1)
@@ -115,10 +178,18 @@ export default function WorkingShiftPage() {
 
    const loadData = () => { refetchShifts(); refetchSummary() }
 
-   useEffect(() => { setCurrentPage(1) }, [search, statusFilter, shiftFilter, startDate, endDate])
+   useEffect(() => { setCurrentPage(1) }, [search, statusFilter, shiftFilter, varianceFilter, startDate, endDate])
 
    const confirmDelete = async () => {
       if (!itemToDelete) return
+      if (itemToDelete.shift_status === "Closed") {
+         toastError(
+            isKh ? "លុបមិនបាន" : "Delete failed",
+            isKh ? "វេនដែលបិទហើយមិនអាចលុបបានទេ" : "Closed shifts cannot be deleted"
+         )
+         setIsDeleteAlertOpen(false); setItemToDelete(null)
+         return
+      }
       try {
          await remove.mutateAsync(itemToDelete.id)
          toastSuccess(
@@ -132,20 +203,40 @@ export default function WorkingShiftPage() {
       }
    }
 
-   const hasFilter = search || statusFilter !== "all" || shiftFilter !== "all" || startDate || endDate
+   const hasFilter = search || statusFilter !== "all" || shiftFilter !== "all" || varianceFilter !== "all" || startDate || endDate
 
    const processedData = useMemo(() =>
       shifts.filter(s => {
          const matchSearch = (s.staff_name || "").toLowerCase().includes(search.toLowerCase())
          const matchStatus = statusFilter === "all" || s.shift_status === statusFilter
          const matchShift = shiftFilter === "all" || s.shift_type === shiftFilter
-         return matchSearch && matchStatus && matchShift
+         let matchVariance = true
+         if (varianceFilter !== "all") {
+            const v = getVariance(s)
+            if (!v) matchVariance = false
+            else if (varianceFilter === "short") matchVariance = v.diff < 0
+            else if (varianceFilter === "over") matchVariance = v.diff > 0
+            else if (varianceFilter === "balanced") matchVariance = v.diff === 0
+         }
+         return matchSearch && matchStatus && matchShift && matchVariance
       }),
-      [shifts, search, statusFilter, shiftFilter]
+      [shifts, search, statusFilter, shiftFilter, varianceFilter]
+   )
+
+   const shortCount = useMemo(
+      () => shifts.filter(s => (getVariance(s)?.diff ?? 0) < 0).length,
+      [shifts]
+   )
+   const shortTotal = useMemo(
+      () => shifts.reduce((sum, s) => {
+         const d = getVariance(s)?.diff ?? 0
+         return d < 0 ? sum + Math.abs(d) : sum
+      }, 0),
+      [shifts]
    )
 
    const reset = () => {
-      setSearch(""); setStatusFilter("all"); setShiftFilter("all")
+      setSearch(""); setStatusFilter("all"); setShiftFilter("all"); setVarianceFilter("all")
       setStartDate(""); setEndDate(""); setCurrentPage(1)
    }
 
@@ -215,6 +306,10 @@ export default function WorkingShiftPage() {
          ),
       },
       {
+         key: "variance", header: isKh ? "ខ្វះ/លើស" : "Variance",
+         render: (item: WorkingShift) => <VarianceBadge item={item} isKh={isKh} />,
+      },
+      {
          key: "total_orders", header: isKh ? "ការបញ្ជាទិញ" : "Total Orders",
          render: (item: WorkingShift) => (
             <div className="flex items-center gap-1.5">
@@ -263,7 +358,7 @@ export default function WorkingShiftPage() {
                   title={isKh ? "មើលលម្អិត" : "View Details"} >
                   <Eye className="w-3.5 h-3.5" />
                </button>
-               {can("delete") && (
+               {can("delete") && item.shift_status !== "Closed" && (
                   <button
                      onClick={() => { setItemToDelete(item); setIsDeleteAlertOpen(true) }}
                      className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
@@ -317,7 +412,22 @@ export default function WorkingShiftPage() {
          lbl: "text-gray-600 dark:text-gray-200",
          ibg: "bg-violet-100 dark:bg-violet-400/20",
       },
+      {
+         label: isKh ? "វេនខ្វះលុយ" : "Cash Shortage",
+         value: shortCount,
+         sub: shortCount > 0
+            ? `${isKh ? "សរុបខ្វះ" : "Total short"} ${fmt_usd(shortTotal)}`
+            : (isKh ? "គ្មានបញ្ហា" : "No issues"),
+         icon: AlertTriangle,
+         bg: "bg-white dark:bg-[#22263a]",
+         border: shortCount > 0 ? "border-rose-200 dark:border-rose-500/30" : "border-white dark:border-[#22263a]",
+         text: "!text-rose-700 dark:!text-rose-300",
+         lbl: "text-gray-600 dark:text-gray-200",
+         ibg: "bg-rose-100 dark:bg-rose-400/20",
+      },
    ]
+
+   const variance = viewItem ? getVariance(viewItem) : null
 
    return (
       <div className="flex h-screen bg-gray-50 dark:bg-[#13151f] overflow-hidden transition-colors duration-300" style={SORA}>
@@ -347,7 +457,7 @@ export default function WorkingShiftPage() {
                </div>
             ) : (
                <main className="flex-1 p-5 space-y-4 overflow-hidden flex flex-col">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
                      {statCards.map((s, i) => (
                         <motion.div key={s.label}
                            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
@@ -407,6 +517,18 @@ export default function WorkingShiftPage() {
                               <SelectItem value="Afternoon" className={SEL_I}>{isKh ? "រសៀល" : "Afternoon"}</SelectItem>
                               <SelectItem value="Night" className={SEL_I}>{isKh ? "យប់" : "Night"}</SelectItem>
                               <SelectItem value="Full Day" className={SEL_I}>{isKh ? "ពេញថ្ងៃ" : "Full Day"}</SelectItem>
+                           </SelectContent>
+                        </Select>
+                        <Select value={varianceFilter} onValueChange={setVarianceFilter}>
+                           <SelectTrigger className="h-9 text-[14px]  rounded-lg border border-gray-200/80 dark:border-white/[0.08] bg-white dark:bg-[#22263a] text-gray-700 dark:text-white/70 shadow-sm w-40 flex items-center gap-1.5">
+                              <Wallet className={cn("w-3.5 h-3.5 shrink-0", ACCENT.text)} />
+                              <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent className={SEL_C} style={SORA}>
+                              <SelectItem value="all" className={SEL_I}>{isKh ? "ខ្វះ/លើស ទាំងអស់" : "All Variance"}</SelectItem>
+                              <SelectItem value="short" className={SEL_I}>{isKh ? "ខ្វះលុយ" : "Cash Short"}</SelectItem>
+                              <SelectItem value="over" className={SEL_I}>{isKh ? "លើសលុយ" : "Cash Over"}</SelectItem>
+                              <SelectItem value="balanced" className={SEL_I}>{isKh ? "ត្រឹមត្រូវ" : "Balanced"}</SelectItem>
                            </SelectContent>
                         </Select>
                         <DateRangePicker
@@ -554,6 +676,59 @@ export default function WorkingShiftPage() {
                            </div>
                         )}
                      </div>
+
+                     {variance && (() => {
+                        const isShort = variance.diff < 0
+                        const isOver = variance.diff > 0
+                        return (
+                           <div className={cn("rounded-xl border p-4 space-y-2",
+                              isShort && "border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10",
+                              isOver && "border-orange-200 bg-orange-50 dark:border-orange-500/30 dark:bg-orange-500/10",
+                              !isShort && !isOver && "border-emerald-100 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10",
+                           )}>
+                              <div className="flex items-center gap-2 mb-1">
+                                 {isShort || isOver
+                                    ? <AlertTriangle className={cn("w-4 h-4", isShort ? "text-rose-500" : "text-orange-500")} />
+                                    : <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                                 <span className="text-[12px] font-black uppercase tracking-widest text-gray-600 dark:text-white/50">
+                                    {isKh ? "ការផ្ទៀងផ្ទាត់ប្រាក់" : "Cash Reconciliation"}
+                                 </span>
+                              </div>
+                              <div className="flex justify-between text-[14px] text-gray-700 dark:text-white/70">
+                                 <span>{isKh ? "ប្រាក់គួរមាន" : "Expected"}</span>
+                                 <span className="font-mono">{fmt_usd(variance.expected)}</span>
+                              </div>
+                              <div className="flex justify-between text-[14px] text-gray-700 dark:text-white/70">
+                                 <span>{isKh ? "ប្រាក់ចេញពិតប្រាកដ" : "Actual"}</span>
+                                 <span className="font-mono">{fmt_usd(variance.actual)}</span>
+                              </div>
+                              <div className={cn("flex justify-between text-[15px] font-black pt-2 border-t",
+                                 isShort && "text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30",
+                                 isOver && "text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/30",
+                                 !isShort && !isOver && "text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30",
+                              )}>
+                                 <span>
+                                    {isShort ? (isKh ? "ខ្វះលុយ" : "Cash Shortage")
+                                       : isOver ? (isKh ? "លើសលុយ" : "Cash Over")
+                                          : (isKh ? "ត្រឹមត្រូវ" : "Balanced")}
+                                 </span>
+                                 <span className="font-mono">{isOver ? "+" : ""}{fmt_usd(variance.diff)}</span>
+                              </div>
+                           </div>
+                        )
+                     })()}
+
+                     {/* Closed shift with no saved reconciliation (closed before this feature) */}
+                     {!variance && viewItem.shift_status === "Closed" && (
+                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.07]">
+                           <p className="text-[12px] text-gray-600 dark:text-white/40">
+                              {isKh
+                                 ? "វេននេះបិទមុនមានមុខងារផ្ទៀងផ្ទាត់ប្រាក់ ដូច្នេះមិនមានទិន្នន័យខ្វះ/លើសទេ។"
+                                 : "This shift was closed before cash reconciliation was recorded, so there is no variance data."}
+                           </p>
+                        </div>
+                     )}
+
                      <div className="grid grid-cols-3 gap-3">
                         <div className={cn("p-3 rounded-xl border text-center", ACCENT.ibg, ACCENT.subtleBorder)}>
                            <ShoppingBag className={cn("w-4 h-4 mx-auto mb-1", ACCENT.text)} />

@@ -1,29 +1,29 @@
 "use client"
 
-import { useState }        from "react"
-import { useTranslation }  from "react-i18next"
+import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Check }           from "lucide-react"
-import { cn }              from "@/lib/utils"
+import { Check } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 const SORA: React.CSSProperties = { fontFamily: "'Sora', sans-serif" }
 
 type Lang = "en" | "kh"
 interface Props {
-  open:         boolean
+  open: boolean
   onOpenChange: (open: boolean) => void
 }
 export function LanguageSwitcher({ open, onOpenChange }: Props) {
   const { t, i18n } = useTranslation("common")
-  const current     = (i18n.language === "kh" ? "kh" : "en") as Lang
+  const current = (i18n.language === "kh" ? "kh" : "en") as Lang
   const [selected, setSelected] = useState<Lang>(current)
   const handleApply = () => {
     i18n.changeLanguage(selected)
     onOpenChange(false)
   }
   const options: { value: Lang; label: string; sub: string; flag: string }[] = [
-    { value: "en", label: "English",       sub: "English language", flag: "🇺🇸" },
-    { value: "kh", label: "ខ្មែរ (Khmer)", sub: "ភាសាខ្មែរ",        flag: "🇰🇭" },
+    { value: "en", label: "English", sub: "English language", flag: "🇺🇸" },
+    { value: "kh", label: "ខ្មែរ (Khmer)", sub: "ភាសាខ្មែរ", flag: "🇰🇭" },
   ]
 
   return (
@@ -49,7 +49,7 @@ export function LanguageSwitcher({ open, onOpenChange }: Props) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left",
                 selected === opt.value
-                  ? "border-indigo-400 dark:border-indigo-500/50 bg-indigo-50 dark:bg-indigo-500/10"
+                  ? "border-[#03624C] dark:border-indigo-500/50 bg-[#03624C]/[0.06] dark:bg-indigo-500/10"
                   : "border-gray-200 dark:border-white/[0.10] bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/[0.06]"
               )} >
               <span className="text-xl leading-none">{opt.flag}</span>
@@ -57,7 +57,7 @@ export function LanguageSwitcher({ open, onOpenChange }: Props) {
                 <p className={cn(
                   "text-[13px] font-semibold",
                   selected === opt.value
-                    ? "text-indigo-600 dark:text-indigo-400"
+                    ? "text-[#03624C] dark:text-indigo-400"
                     : "text-gray-700 dark:text-white/80"
                 )} >
                   {opt.label}
@@ -67,7 +67,7 @@ export function LanguageSwitcher({ open, onOpenChange }: Props) {
                 </p>
               </div>
               {selected === opt.value && (
-                <div className="w-5 h-5 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shrink-0">
+                <div className="w-5 h-5 rounded-full bg-[#03624C] dark:bg-indigo-500 flex items-center justify-center shrink-0">
                   <Check className="w-3 h-3 text-white" strokeWidth={3} />
                 </div>
               )}
@@ -83,7 +83,7 @@ export function LanguageSwitcher({ open, onOpenChange }: Props) {
             </button>
             <button
               onClick={handleApply}
-              className="h-9 px-6 rounded-lg text-[12px] font-semibold transition-all bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/30 dark:text-indigo-300 dark:border dark:border-indigo-500/30 dark:shadow-none" >
+              className="h-9 px-6 rounded-lg text-[12px] font-semibold transition-all bg-[#03624C] hover:bg-[#03624C]/80 text-white shadow-md shadow-[#03624C]/20 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/30 dark:text-indigo-300 dark:border dark:border-indigo-500/30 dark:shadow-none" >
               {t("apply")}
             </button>
           </div>

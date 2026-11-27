@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useRef } from "react"
+import React, { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sidebar, navigation, NavItem } from "@/components/sidebar"
 import { Header } from "@/components/header"
@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils"
 import { rolesApi } from "@/lib/api"
 import type { User as ApiUser } from "@/types"
-import { usePermission } from "@/lib/role-context"
+import { usePermission, useRole } from "@/lib/role-context"
 import { getAvatarUrl } from "@/lib/avatar"
 import { useRolesList, useRolesMutations } from "@/hooks/settings/use-roles"
 import { useUsersList } from "@/hooks/settings/use-users"
@@ -71,35 +71,52 @@ const KPI = {
    },
 }
 
+type PermKey = "view" | "create" | "edit" | "delete"
+const PERMS: PermKey[] = ["view", "create", "edit", "delete"]
+
+/**
+ * Dependency នេះផ្តល់តែ "view" នៃ page មេ (ដើម្បីឲ្យ menu/route ចូលបាន)
+ * វាមិនផ្តល់ create/edit/delete ទេ។
+ */
 const PAGE_DEPS: Record<string, { requires: string[]; label: string; labelKh: string }> = {
-   reports: {
-      requires: ["finance", "inventory", "orders"],
-      label: "Reports",
-      labelKh: "របាយការណ៍",
-   },
-   roles: {
-      requires: ["settings"],
-      label: "Role Management",
-      labelKh: "កំណត់សិទ្ធិ",
-   },
-   staff: {
-      requires: ["settings"],
-      label: "Staff",
-      labelKh: "បុគ្គលិក",
-   },
-   users: {
-      requires: ["settings"],
-      label: "Users",
-      labelKh: "អ្នកប្រើប្រាស់",
-   },
-   workshifts: {
-      requires: ["settings"],
-      label: "Working Shifts",
-      labelKh: "វេនធ្វើការ",
-   },
+   reports: { requires: ["finance", "inventory", "orders"], label: "Reports", labelKh: "របាយការណ៍" },
+   "overview-report": { requires: ["finance", "inventory", "orders"], label: "Overview Report", labelKh: "របាយការណ៍ទូទៅ" },
+   "shift-report": { requires: ["finance", "inventory", "orders"], label: "Shift Report", labelKh: "របាយការណ៍វេន" },
+   "inventory-report": { requires: ["finance", "inventory", "orders"], label: "Inventory Report", labelKh: "របាយការណ៍ស្តុក" },
+   roles: { requires: ["settings"], label: "Role Management", labelKh: "កំណត់សិទ្ធិ" },
+   staff: { requires: ["settings"], label: "Staff", labelKh: "បុគ្គលិក" },
+   users: { requires: ["settings"], label: "Users", labelKh: "អ្នកប្រើប្រាស់" },
+   workshifts: { requires: ["settings"], label: "Working Shifts", labelKh: "វេនធ្វើការ" },
 }
 
-const VIEW_ONLY_PAGES = ["dashboard", "reports"]
+/** pageKey ដែលមានតែ View (Dashboard + Reports ទាំង៣) */
+const VIEW_ONLY_PAGES = [
+   "dashboard",
+   "reports",
+   "overview-report",
+   "shift-report",
+   "inventory-report",
+   "orders-history",
+   "transactions",
+]
+
+/** href ដែលមានតែ View — សូមពិនិត្យឲ្យត្រូវនឹង href ពិតក្នុង sidebar */
+const VIEW_ONLY_HREFS = [
+   "/sale/transactions",
+   "/order-history",
+   "/stock-history",
+]
+
+/** Page ដែលលាក់ពី UI (រក្សាទិន្នន័យសិទ្ធិដើម មិនលុប) */
+const HIDDEN_PAGE_KEYS = ["pos"]
+const HIDDEN_HREFS = ["/pos"]
+const isHiddenPage = (p: any) =>
+   HIDDEN_PAGE_KEYS.includes(p.pageKey) ||
+   HIDDEN_HREFS.some(h => p.href?.startsWith(h))
+
+const isViewOnlyPage = (p: any) =>
+   VIEW_ONLY_PAGES.includes(p.pageKey) ||
+   VIEW_ONLY_HREFS.some(h => p.href?.includes(h))
 
 const extractSystemPages = () => {
    const pages: any[] = []
@@ -134,9 +151,11 @@ const extractSystemPages = () => {
    return pages
 }
 
-export const SYSTEM_PAGES = extractSystemPages().filter(p => p.pageKey !== "orders")
-const PERMS: ("view" | "create" | "edit" | "delete")[] = ["view", "create", "edit", "delete"]
+export const SYSTEM_PAGES = extractSystemPages()
+
 const isAdminRole = (name: string) => ["administrator", "admin"].includes(name?.toLowerCase())
+
+const emptyPerms = () => ({ view: false, create: false, edit: false, delete: false })
 
 function mergeWithSystemPages(savedPages: any[]): any[] {
    const savedMap = new Map<string, any>()
@@ -147,19 +166,21 @@ function mergeWithSystemPages(savedPages: any[]): any[] {
    }
    return SYSTEM_PAGES.map(sp => {
       const saved = savedMap.get(sp.permKey) || savedMap.get(sp.pageKey)
-      return {
-         ...sp,
-         permissions: saved?.permissions ?? { view: false, create: false, edit: false, delete: false },
+      const perms = { ...emptyPerms(), ...(saved?.permissions ?? {}) }
+      // សម្អាត permission ចាស់ ក្នុង page ដែលមានតែ View
+      if (isViewOnlyPage(sp)) {
+         perms.create = false
+         perms.edit = false
+         perms.delete = false
       }
+      return { ...sp, permissions: perms }
    })
 }
 
-function applyPageDependencies(
-   pages: any[],
-   changedPageKey: string,
-   newValue: boolean
-): { pages: any[]; autoGrantedLabels: string[] } {
-   if (!newValue) return { pages, autoGrantedLabels: [] }
+const hasAnyPerm = (p: any) => PERMS.some(k => p.permissions?.[k])
+
+/** បើ page ណាមួយមាន permission ណាមួយ => ផ្តល់ view ដល់ page ដែលវាពឹងផ្អែក (view តែប៉ុណ្ណោះ) */
+function applyPageDependencies(pages: any[], changedPageKey: string): { pages: any[]; autoGrantedLabels: string[] } {
    const dep = PAGE_DEPS[changedPageKey]
    if (!dep) return { pages, autoGrantedLabels: [] }
    const autoGrantedLabels: string[] = []
@@ -173,16 +194,22 @@ function applyPageDependencies(
 }
 
 function ensureAllDependencies(pages: any[]): any[] {
+   // page ណាមានសិទ្ធិណាមួយ => ត្រូវមាន View ជានិច្ច
+   pages = pages.map(p =>
+      hasAnyPerm(p) && !p.permissions.view
+         ? { ...p, permissions: { ...p.permissions, view: true } }
+         : p
+   )
    let result = [...pages]
-   for (const pg of result) {
-      if (!pg.permissions.view) continue
+   for (const pg of pages) {
+      if (!hasAnyPerm(pg)) continue
       const dep = PAGE_DEPS[pg.pageKey]
       if (!dep) continue
-      result = result.map(p => {
-         if (!dep.requires.includes(p.pageKey)) return p
-         if (p.permissions.view) return p
-         return { ...p, permissions: { ...p.permissions, view: true } }
-      })
+      result = result.map(p =>
+         dep.requires.includes(p.pageKey) && !p.permissions.view
+            ? { ...p, permissions: { ...p.permissions, view: true } }
+            : p
+      )
    }
    return result
 }
@@ -230,11 +257,25 @@ function KpiCard({
    )
 }
 
+const formatDateCell = (raw?: string) => {
+   if (!raw) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
+   const d = new Date(raw)
+   const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+   const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+   return (
+      <div className="flex flex-col gap-0.5">
+         <span className="text-[14px] text-gray-700 dark:text-white/70">{date}</span>
+         <span className="text-[12px] text-gray-600 dark:text-white/30">{time}</span>
+      </div>
+   )
+}
+
 export default function RolePage() {
    const { i18n } = useTranslation()
    const isKh = i18n.language === "kh" || i18n.language === "khmer"
    const { t } = useTranslation("common")
    const { can } = usePermission("roles")
+   const { user: currentUser, refreshUser } = useRole()
 
    const { data: roles = [], isLoading: rolesLoading } = useRolesList()
    const { data: allUsers = [], isLoading: usersLoading } = useUsersList()
@@ -253,6 +294,8 @@ export default function RolePage() {
    const [nameError, setNameError] = useState<string | undefined>()
    const [depInfo, setDepInfo] = useState<string[]>([])
    const originalSnapshot = useRef<string>("")
+   // ឈ្មោះ role ដើមមុនកែ (សម្រាប់ប្រៀបធៀបជាមួយ user ឥឡូវ)
+   const originalRoleName = useRef<string>("")
    const [isUsersDialogOpen, setIsUsersDialogOpen] = useState(false)
    const [usersDialogRole, setUsersDialogRole] = useState<any>(null)
    const [roleUsers, setRoleUsers] = useState<ApiUser[]>([])
@@ -267,10 +310,9 @@ export default function RolePage() {
       setIsViewMode(false); setNameError(undefined); setDepInfo([])
       const newRole = {
          name: "", description: "",
-         pages: SYSTEM_PAGES.map(p => ({
-            ...p, permissions: { view: false, create: false, edit: false, delete: false },
-         })),
+         pages: SYSTEM_PAGES.map(p => ({ ...p, permissions: emptyPerms() })),
       }
+      originalRoleName.current = ""
       setEditingRole(newRole)
       originalSnapshot.current = JSON.stringify(newRole)
       setIsDialogOpen(true)
@@ -279,8 +321,10 @@ export default function RolePage() {
    const handleOpenEdit = async (role: any, viewOnly = false) => {
       setIsViewMode(viewOnly); setNameError(undefined); setDepInfo([])
       setIsDialogOpen(true); setDialogLoading(true)
+      originalRoleName.current = role?.name ?? ""
       try {
          const full = await rolesApi.get(role.id)
+         originalRoleName.current = full?.name ?? role?.name ?? ""
          const clone = { ...full, pages: mergeWithSystemPages(full.pages ?? []) }
          setEditingRole(clone)
          originalSnapshot.current = JSON.stringify(clone)
@@ -299,22 +343,33 @@ export default function RolePage() {
       finally { setUsersLoading2(false) }
    }
 
-   const handleTogglePerm = (pageIdx: number, perm: "view" | "create" | "edit" | "delete") => {
+   /**
+    * permission នីមួយៗឯករាជ្យ។
+    * Page ដែលមានតែ View មិនអាចបើក create/edit/delete បានទេ។
+    */
+   const handleTogglePerm = (pageIdx: number, perm: PermKey) => {
       if (isViewMode) return
       const pg = editingRole.pages[pageIdx]
+      if (isViewOnlyPage(pg) && perm !== "view") return
       const newVal = !pg.permissions[perm]
 
-      let updatedPerms = { ...pg.permissions, [perm]: newVal }
-      if (newVal && perm !== "view") updatedPerms.view = true
-      if (!newVal && perm === "view") updatedPerms = { view: false, create: false, edit: false, delete: false }
-
+      // tick Create/Edit/Delete => View នៃ page ដដែល auto tick
       let newPages = editingRole.pages.map((p: any, i: number) =>
-         i !== pageIdx ? p : { ...p, permissions: updatedPerms }
+         i !== pageIdx
+            ? p
+            : {
+               ...p,
+               permissions: {
+                  ...p.permissions,
+                  [perm]: newVal,
+                  ...(newVal && perm !== "view" ? { view: true } : {}),
+               },
+            }
       )
 
       if (newVal) {
-         const { pages: pagesWithDeps, autoGrantedLabels } = applyPageDependencies(newPages, pg.pageKey, true)
-         newPages = pagesWithDeps
+         const { pages: withDeps, autoGrantedLabels } = applyPageDependencies(newPages, pg.pageKey)
+         newPages = withDeps
          if (autoGrantedLabels.length > 0) {
             const msg = isKh
                ? `បន្ថែម View ស្វ័យប្រវត្តិ: ${autoGrantedLabels.join(", ")}`
@@ -327,23 +382,26 @@ export default function RolePage() {
       setEditingRole({ ...editingRole, pages: newPages })
    }
 
-   const toggleAllInColumn = (perm: "view" | "create" | "edit" | "delete") => {
+   const toggleAllInColumn = (perm: PermKey) => {
       if (isViewMode) return
-      const eligible = editingRole.pages.filter((p: any) => !(VIEW_ONLY_PAGES.includes(p.pageKey) && perm !== "view"))
+      const isLocked = (p: any) => isHiddenPage(p) || (isViewOnlyPage(p) && perm !== "view")
+      const eligible = editingRole.pages.filter((p: any) => !isLocked(p))
       const allChecked = eligible.every((p: any) => p.permissions[perm])
-      let newPages = editingRole.pages.map((p: any) => {
-         if (VIEW_ONLY_PAGES.includes(p.pageKey) && perm !== "view") return p
-         const updated = { ...p.permissions, [perm]: !allChecked }
-         if (updated[perm] && perm !== "view") updated.view = true
-         if (!updated[perm] && perm === "view") { updated.create = false; updated.edit = false; updated.delete = false }
-         return { ...p, permissions: updated }
-      })
-      if (!allChecked) {
-         for (const pg of newPages) {
-            const { pages: after } = applyPageDependencies(newPages, pg.pageKey, true)
-            newPages = after
-         }
-      }
+
+      let newPages = editingRole.pages.map((p: any) =>
+         isLocked(p)
+            ? p
+            : {
+               ...p,
+               permissions: {
+                  ...p.permissions,
+                  [perm]: !allChecked,
+                  ...(!allChecked && perm !== "view" ? { view: true } : {}),
+               },
+            }
+      )
+
+      if (!allChecked) newPages = ensureAllDependencies(newPages)
       setDepInfo([])
       setEditingRole({ ...editingRole, pages: newPages })
    }
@@ -357,7 +415,12 @@ export default function RolePage() {
          toastWarn(isKh ? "មិនមានការផ្លាស់ប្តូរ" : "No changes detected")
          return
       }
-      const finalPages = ensureAllDependencies(editingRole.pages)
+      // សម្អាត create/edit/delete នៃ page ដែលមានតែ View មុនផ្ញើទៅ backend
+      const finalPages = ensureAllDependencies(editingRole.pages).map((p: any) =>
+         isViewOnlyPage(p)
+            ? { ...p, permissions: { ...p.permissions, create: false, edit: false, delete: false } }
+            : p
+      )
       const payload = {
          name: editingRole.name,
          description: editingRole.description ?? "",
@@ -370,6 +433,10 @@ export default function RolePage() {
                isKh ? "ធ្វើបច្ចុប្បន្នភាពដោយជោគជ័យ" : "Updated successfully",
                isKh ? `សិទ្ធ "${updated.name}" ធ្វើបច្ចុប្បន្នភាពដោយជោគជ័យ` : `Role "${updated.name}" has been updated successfully`
             )
+            // បើកែ role ដែលខ្លួនឯងកំពុងប្រើ => ទាញ permission ថ្មី
+            if (currentUser?.role && (currentUser.role === originalRoleName.current || currentUser.role === updated.name)) {
+               await refreshUser()
+            }
          } else {
             const created = await create.mutateAsync(payload)
             toastSuccess(
@@ -379,7 +446,7 @@ export default function RolePage() {
          }
          setIsDialogOpen(false)
       } catch (err: any) {
-         toastError(isKh ? "រក្សាទុកមិនបាន" : "Save failed", err?.message)
+         toastError(isKh ? "រក្សាទុកមិនបាន" : "Save failed", err?.response?.data?.message ?? err?.message)
       }
    }
 
@@ -403,7 +470,7 @@ export default function RolePage() {
             isKh ? `លុប "${roleToDelete.name}" បានដោយជោគជ័យ` : `Role "${roleToDelete.name}" has been deleted successfully`
          )
       } catch (err: any) {
-         toastError(isKh ? "លុបមិនបាន" : "Delete failed", err?.message)
+         toastError(isKh ? "លុបមិនបាន" : "Delete failed", err?.response?.data?.message ?? err?.message)
       } finally { setIsDeleteAlertOpen(false); setRoleToDelete(null) }
    }
 
@@ -443,8 +510,8 @@ export default function RolePage() {
                      "hover:bg-[#03624C]/[0.08] dark:hover:bg-[#1857D8]/[0.12]",
                      "hover:border-[#03624C]/20 dark:hover:border-[#1857D8]/25"
                   )}>
-                  <Users className={cn("w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-[#03624C] dark:group-hover:text-[#1857D8]")} />
-                  <span className={cn("text-[14px] text-gray-600 dark:text-gray-400 transition-colors group-hover:text-[#03624C] dark:group-hover:text-[#1857D8]")}>{count}</span>
+                  <Users className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-[#03624C] dark:group-hover:text-[#1857D8]" />
+                  <span className="text-[14px] text-gray-600 dark:text-gray-400 transition-colors group-hover:text-[#03624C] dark:group-hover:text-[#1857D8]">{count}</span>
                   {localUsers.length > 0 && (
                      <div className="flex -space-x-1.5 ml-1">
                         {localUsers.slice(0, 3).map((u: any) => (
@@ -461,54 +528,26 @@ export default function RolePage() {
             )
          },
       },
-      {
-         key: "createdAt", header: isKh ? "កាលបរិច្ឆេទ" : "Created At",
-         render: (item: any) => {
-            const raw = item.created_at
-            if (!raw) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            const d = new Date(raw)
-            const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
-            const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{date}</span>
-                  <span className="text-[12px] text-gray-600 dark:text-white/30">{time}</span>
-               </div>
-            )
-         },
-      },
-      {
-         key: "updatedAt", header: isKh ? "កែប្រែចុងក្រោយ" : "Last Updated",
-         render: (item: any) => {
-            const raw = item.updated_at
-            if (!raw) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            const d = new Date(raw)
-            const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
-            const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{date}</span>
-                  <span className="text-[12px] text-gray-600 dark:text-white/30">{time}</span>
-               </div>
-            )
-         },
-      },
+      { key: "createdAt", header: isKh ? "កាលបរិច្ឆេទ" : "Created At", render: (item: any) => formatDateCell(item.created_at) },
+      { key: "updatedAt", header: isKh ? "កែប្រែចុងក្រោយ" : "Last Updated", render: (item: any) => formatDateCell(item.updated_at) },
       {
          key: "actions", header: isKh ? "សកម្មភាព" : "Actions", className: "text-right",
          render: (item: any) => (
             <div className="flex items-center justify-end gap-1">
-               <button
-                  onClick={() => handleOpenEdit(item, true)}
-                  className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
-                  text-blue-700 bg-blue-50 border border-blue-200
-                  hover:bg-blue-100 hover:border-blue-300
-                  dark:text-blue-300 dark:bg-blue-900/20 dark:border-blue-700/40
-                  dark:hover:bg-blue-900/40 dark:hover:border-blue-500
-                  transition-all duration-150"
-                  title={isKh ? "មើលលម្អិត" : "View Details"}
-               >
-                  <Eye className="w-3.5 h-3.5" />
-               </button>
+               {can("view") && (
+                  <button
+                     onClick={() => handleOpenEdit(item, true)}
+                     className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
+                     text-blue-700 bg-blue-50 border border-blue-200
+                     hover:bg-blue-100 hover:border-blue-300
+                     dark:text-blue-300 dark:bg-blue-900/20 dark:border-blue-700/40
+                     dark:hover:bg-blue-900/40 dark:hover:border-blue-500
+                     transition-all duration-150"
+                     title={isKh ? "មើលលម្អិត" : "View Details"}
+                  >
+                     <Eye className="w-3.5 h-3.5" />
+                  </button>
+               )}
                {can("edit") && (
                   <button
                      onClick={() => handleOpenEdit(item, false)}
@@ -618,9 +657,11 @@ export default function RolePage() {
                </motion.div>
             </main>
          </div>
+
+         {/* ───────── Role dialog ───────── */}
          <Dialog open={isDialogOpen} onOpenChange={v => { if (!saving) setIsDialogOpen(v) }}>
             <DialogContent
-               className="max-w-lg p-0 border border-gray-200 dark:border-white/[0.13] shadow-2xl rounded-lg bg-white dark:bg-[#1e2235] flex flex-col [&>button]:hidden"
+               className="max-w-lg max-h-[90vh] p-0 border border-gray-200 dark:border-white/[0.13] shadow-2xl rounded-lg bg-white dark:bg-[#1e2235] flex flex-col overflow-hidden [&>button]:hidden"
                style={SORA} >
                <DialogHeader className="px-6 py-4 border-b border-gray-100 dark:border-white/[0.07] shrink-0 bg-gray-50 dark:bg-[#22263a] rounded-t-lg">
                   <div className="flex items-center gap-2.5">
@@ -647,8 +688,8 @@ export default function RolePage() {
                      </span>
                   </div>
                ) : (
-                  <div className="p-6 space-y-5 max-h-[60vh] overflow-auto">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-6 space-y-5 flex-1 min-h-0 flex flex-col">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
                         <div className="space-y-1.5">
                            <Label className={cn("text-[14px] uppercase tracking-wider text-gray-600 dark:text-white/30", nameError && "text-rose-500")}>
                               {isKh ? "ឈ្មោះតួនាទី" : "Role Name"}
@@ -677,7 +718,7 @@ export default function RolePage() {
                         </div>
                      </div>
                      {depInfo.length > 0 && (
-                        <div className="flex items-start gap-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl px-4 py-3">
+                        <div className="flex items-start gap-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl px-4 py-3 shrink-0">
                            <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                            <div className="space-y-1">
                               {depInfo.map((msg, i) => (
@@ -686,23 +727,23 @@ export default function RolePage() {
                            </div>
                         </div>
                      )}
-                     <div className="rounded-xl border border-gray-100 dark:border-white/[0.08] overflow-hidden">
-                        <table className="w-full text-[14px]">
-                           <thead className="bg-gray-50 dark:bg-white/[0.03] text-gray-600 dark:text-white/40 font-bold uppercase text-[12px] tracking-wider">
+
+                     {/* Scroll តែក្នុង table — header (View/Create/Edit/Delete) ជាប់ខាងលើជានិច្ច */}
+                     <div className="rounded-xl border border-gray-100 dark:border-white/[0.08] overflow-auto min-h-0 flex-1 max-h-[50vh]">
+                        <table className="w-full text-[14px] border-separate border-spacing-0">
+                           <thead className="text-gray-600 dark:text-white/40 font-bold uppercase text-[12px] tracking-wider">
                               <tr>
-                                 <th className="px-4 py-3 text-left border-b border-gray-100 dark:border-white/[0.06]">
+                                 <th className="sticky top-0 z-20 px-4 py-3 text-left border-b border-gray-100 dark:border-white/[0.06] bg-gray-50 dark:bg-[#252a3d]">
                                     {isKh ? "ឈ្មោះទំព័រ" : "Page / Module"}
                                  </th>
                                  {PERMS.map(p => (
-                                    <th key={p} className="px-3 py-3 text-center border-b border-gray-100 dark:border-white/[0.06] w-16">
+                                    <th key={p} className="sticky top-0 z-20 px-3 py-3 text-center border-b border-gray-100 dark:border-white/[0.06] w-16 bg-gray-50 dark:bg-[#252a3d]">
                                        <button
                                           disabled={isViewMode}
                                           onClick={() => toggleAllInColumn(p)}
                                           className={cn(
                                              "uppercase outline-none transition-colors",
-                                             isViewMode
-                                                ? "cursor-default opacity-50"
-                                                : "cursor-pointer hover:opacity-70",
+                                             isViewMode ? "cursor-default opacity-50" : "cursor-pointer hover:opacity-70",
                                              ACCENT.text
                                           )}
                                        >
@@ -714,59 +755,64 @@ export default function RolePage() {
                                  ))}
                               </tr>
                            </thead>
-                           <tbody className="divide-y divide-gray-100 dark:divide-[#22263a] bg-white dark:bg-transparent">
-                              {editingRole?.pages.map((pg: any, idx: number) => {
-                                 const prevPg = editingRole.pages[idx - 1]
-                                 const showSection = pg.section && pg.section !== prevPg?.section
-                                 const isViewOnly = VIEW_ONLY_PAGES.includes(pg.pageKey)
-                                 return (
-                                    <React.Fragment key={pg.permKey || pg.pageKey}>
-                                       {showSection && (
-                                          <tr className="bg-gray-50/80 dark:bg-white/[0.02]">
-                                             <td colSpan={5} className="px-4 py-1.5">
-                                                <span className={cn("text-[11px] font-black uppercase tracking-[2px]", ACCENT.text)}>
-                                                   {isKh ? pg.sectionKh : pg.section}
-                                                </span>
+                           <tbody className="bg-white dark:bg-transparent">
+                              {(() => {
+                                 const visiblePages = (editingRole?.pages ?? [])
+                                    .map((pg: any, idx: number) => ({ pg, idx }))
+                                    .filter(({ pg }: any) => !isHiddenPage(pg))
+                                 return visiblePages.map(({ pg, idx }: any, vi: number) => {
+                                    const prevPg = visiblePages[vi - 1]?.pg
+                                    const showSection = pg.section && pg.section !== prevPg?.section
+                                    const isViewOnly = isViewOnlyPage(pg)
+                                    return (
+                                       <React.Fragment key={pg.permKey || pg.pageKey}>
+                                          {showSection && (
+                                             <tr className="bg-gray-50/80 dark:bg-white/[0.02]">
+                                                <td colSpan={5} className="px-4 py-1.5 border-b border-gray-100 dark:border-[#22263a]">
+                                                   <span className={cn("text-[11px] font-black uppercase tracking-[2px]", ACCENT.text)}>
+                                                      {isKh ? pg.sectionKh : pg.section}
+                                                   </span>
+                                                </td>
+                                             </tr>
+                                          )}
+                                          <tr>
+                                             <td className="px-4 py-2.5 font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-[#22263a]">
+                                                <div className="flex items-center gap-2">
+                                                   <ChevronRight className={cn("w-3 h-3 shrink-0 opacity-40", ACCENT.text)} />
+                                                   <span className="text-[14px]">{isKh ? pg.labelKh : pg.label}</span>
+                                                </div>
                                              </td>
-                                          </tr>
-                                       )}
-                                       <tr>
-                                          <td className="px-4 py-2.5 font-semibold text-gray-700 dark:text-gray-300">
-                                             <div className="flex items-center gap-2">
-                                                <ChevronRight className={cn("w-3 h-3 shrink-0 opacity-40", ACCENT.text)} />
-                                                <span className="text-[14px]">{isKh ? pg.labelKh : pg.label}</span>
-                                             </div>
-                                          </td>
-                                          {PERMS.map(perm => {
-                                             if (isViewOnly && perm !== "view") {
+                                             {PERMS.map(perm => {
+                                                if (isViewOnly && perm !== "view") {
+                                                   return (
+                                                      <td key={perm} className="px-3 py-2.5 text-center border-b border-gray-100 dark:border-[#22263a]">
+                                                         <span className="text-[14px] text-gray-200 dark:text-white/10 font-bold select-none">—</span>
+                                                      </td>
+                                                   )
+                                                }
                                                 return (
-                                                   <td key={perm} className="px-3 py-2.5 text-center">
-                                                      <span className="text-[14px] text-gray-200 dark:text-white/10 font-bold select-none">—</span>
+                                                   <td key={perm} className="px-3 py-2.5 text-center border-b border-gray-100 dark:border-[#22263a]">
+                                                      <button
+                                                         disabled={isViewMode}
+                                                         onClick={() => handleTogglePerm(idx, perm)}
+                                                         className={cn(
+                                                            "w-6 h-6 rounded-md border mx-auto flex items-center justify-center transition-all",
+                                                            pg.permissions[perm]
+                                                               ? "bg-[#03624C] dark:bg-[#1857D8] text-white border-[#03624C] dark:border-[#1857D8] shadow-sm"
+                                                               : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20",
+                                                            isViewMode && "opacity-50 cursor-not-allowed pointer-events-none",
+                                                         )}
+                                                      >
+                                                         {pg.permissions[perm] && <Check className="w-3 h-3" strokeWidth={3} />}
+                                                      </button>
                                                    </td>
                                                 )
-                                             }
-                                             return (
-                                                <td key={perm} className="px-3 py-2.5 text-center">
-                                                   <button
-                                                      disabled={isViewMode}
-                                                      onClick={() => handleTogglePerm(idx, perm)}
-                                                      className={cn(
-                                                         "w-6 h-6 rounded-md border mx-auto flex items-center justify-center transition-all",
-                                                         pg.permissions[perm]
-                                                            ? "bg-[#03624C] dark:bg-[#1857D8] text-white border-[#03624C] dark:border-[#1857D8] shadow-sm"
-                                                            : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20",
-                                                         isViewMode && "opacity-50 cursor-not-allowed pointer-events-none",
-                                                      )}
-                                                   >
-                                                      {pg.permissions[perm] && <Check className="w-3 h-3" strokeWidth={3} />}
-                                                   </button>
-                                                </td>
-                                             )
-                                          })}
-                                       </tr>
-                                    </React.Fragment>
-                                 )
-                              })}
+                                             })}
+                                          </tr>
+                                       </React.Fragment>
+                                    )
+                                 })
+                              })()}
                            </tbody>
                         </table>
                      </div>
@@ -793,6 +839,8 @@ export default function RolePage() {
                </DialogFooter>
             </DialogContent>
          </Dialog>
+
+         {/* ───────── Users dialog ───────── */}
          <Dialog open={isUsersDialogOpen} onOpenChange={setIsUsersDialogOpen}>
             <DialogContent className="max-w-sm p-0 border border-gray-200 dark:border-white/[0.13] shadow-2xl rounded-lg bg-white dark:bg-[#1e2235] flex flex-col [&>button]:hidden" style={SORA}>
                <DialogHeader className="px-6 py-4 border-b border-gray-100 dark:border-white/[0.07] shrink-0 bg-gray-50 dark:bg-[#22263a] rounded-t-lg">
@@ -862,6 +910,7 @@ export default function RolePage() {
                </DialogFooter>
             </DialogContent>
          </Dialog>
+
          <ConfirmDialog
             open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}
             onConfirm={confirmDelete} loading={deleting} variant="danger" icon={Trash2}

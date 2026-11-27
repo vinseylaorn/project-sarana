@@ -3,14 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { 
-  Check, Loader2, Printer, AlertTriangle, Banknote, CreditCard, Smartphone, 
-  Plus, Trash2, X, Crown, Tag, Percent 
+import {
+  Check, Loader2, Printer, AlertTriangle, Banknote, CreditCard, Smartphone,
+  Plus, Trash2, X, Crown, Tag, Percent
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/lib/settings-context"
 import { ordersApi } from "@/lib/api"
-import {  toastError, toastWarn } from "@/lib/toast"
+import { get } from "@/lib/api/client"
+import { toastError, toastWarn } from "@/lib/toast"
 import { vipCardApi } from "@/lib/api/vipcard"
 import type { VipCard, VipTier } from "@/types/vipcard"
 import { TierIcon } from "@/components/vip-card/tier-icon"
@@ -19,27 +20,27 @@ import { printBill } from "@/components/pos/print-bill"
 const SORA: React.CSSProperties = { fontFamily: "var(--font-kantumruy), sans-serif" }
 
 interface CartItem {
-  id:              string | number
-  name:            string
-  price:           number
+  id: string | number
+  name: string
+  price: number
   original_price?: number
-  quantity:        number
+  quantity: number
   discount?: {
-    name:       string
-    value:      number
+    name: string
+    value: number
     value_type: "percentage" | "flat"
   }
 }
 
 interface CheckoutDialogProps {
-  open:         boolean
+  open: boolean
   onOpenChange: (open: boolean) => void
-  total:        number
-  items:        CartItem[]
-  onComplete:   (paymentMethod: string) => void
-  orderType:    string
-  orderId?:     number | null
-  language:     string
+  total: number
+  items: CartItem[]
+  onComplete: (paymentMethod: string) => void
+  orderType: string
+  orderId?: number | null
+  language: string
 }
 
 type PaymentMethodId = "cash" | "card" | "mobile"
@@ -50,76 +51,105 @@ interface SplitEntry {
 }
 
 const paymentMethods: { id: PaymentMethodId; label: string; icon: React.ElementType }[] = [
-  { id: "cash",   label: "Cash",    icon: Banknote   },
-  { id: "card",   label: "Card",    icon: CreditCard },
+  { id: "cash", label: "Cash", icon: Banknote },
+  { id: "card", label: "Card", icon: CreditCard },
   { id: "mobile", label: "QR Scan", icon: Smartphone },
 ]
 
 const METHOD_COLORS: Record<PaymentMethodId, string> = {
-  cash:   "#03624C",
-  card:   "#1857D8",
+  cash: "#03624C",
+  card: "#1857D8",
   mobile: "#7C3AED",
 }
 
 export function CheckoutDialog({
   open, onOpenChange, total, items, onComplete, orderType, orderId, language,
 }: CheckoutDialogProps) {
-  const isKh                                = language === "khmer"
-  const { systemLogo, systemName }          = useSettings()
+  const isKh = language === "khmer"
+  const { systemLogo, systemName } = useSettings()
 
-  const [payMode, setPayMode]               = useState<"full" | "split">("full")
+  const [payMode, setPayMode] = useState<"full" | "split">("full")
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodId>("cash")
-  const [inputValue, setInputValue]         = useState("")
+  const [inputValue, setInputValue] = useState("")
 
-  const [splitEntries, setSplitEntries]     = useState<SplitEntry[]>([
+  const [splitEntries, setSplitEntries] = useState<SplitEntry[]>([
     { method: "cash", amount: "" },
     { method: "card", amount: "" },
   ])
   const [activeSplitIdx, setActiveSplitIdx] = useState(0)
 
-  const [discount, setDiscount]             = useState("0")
-  const [discountInput, setDiscountInput]   = useState("")
+  const [discount, setDiscount] = useState("0")
+  const [discountInput, setDiscountInput] = useState("")
   const [editingDiscount, setEditingDiscount] = useState(false)
-  const [discountMode, setDiscountMode]     = useState<"%" | "$">("%")
+  const [discountMode, setDiscountMode] = useState<"%" | "$">("%")
 
-  const [taxEnabled, setTaxEnabled]         = useState(false)
-  const [taxRate, setTaxRate]               = useState("10")
-  const [editingTax, setEditingTax]         = useState(false)
-  const [taxInput, setTaxInput]             = useState("")
+  const [taxEnabled, setTaxEnabled] = useState(false)
+  const [taxRate, setTaxRate] = useState("10")
+  const [editingTax, setEditingTax] = useState(false)
+  const [taxInput, setTaxInput] = useState("")
 
-  const [vipCode,    setVipCode]    = useState("")
-  const [vipCard,    setVipCard]    = useState<VipCard | null>(null)
-  const [vipTier,    setVipTier]    = useState<VipTier | null>(null)
+  const [vipCode, setVipCode] = useState("")
+  const [vipCard, setVipCard] = useState<VipCard | null>(null)
+  const [vipTier, setVipTier] = useState<VipTier | null>(null)
   const [vipLoading, setVipLoading] = useState(false)
-  const [vipError,   setVipError]   = useState("")
-  const vipInputRef                 = useRef<HTMLInputElement>(null)
+  const [vipError, setVipError] = useState("")
+  const vipInputRef = useRef<HTMLInputElement>(null)
 
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isComplete, setIsComplete]     = useState(false)
-  const completedRef                    = useRef(false)
+  const [isComplete, setIsComplete] = useState(false)
+  const completedRef = useRef(false)
 
-  const discountRaw    = Math.max(0, Number(discount) || 0)
+  // ── Exchange rate (follows System Settings: manual / NBC auto) ──
+  const [fxRate, setFxRate] = useState<number | null>(null)
+  const [fxMode, setFxMode] = useState<"auto" | "manual" | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+      ; (async () => {
+        try {
+          const res: any = await get<any>("/pos/exchange-rate")
+          const r = Number(res?.rate)
+          if (!cancelled && r > 0) {
+            setFxRate(r)
+            setFxMode(res?.mode === "auto" ? "auto" : "manual")
+          }
+        } catch {
+          /* rate unavailable -> the riel lines are simply hidden */
+        }
+      })()
+    return () => { cancelled = true }
+  }, [open])
+
+  // USD -> KHR, rounded to the nearest 100៛ (what cashiers actually hand out)
+  const toKhr = (usd: number) => (fxRate ? Math.round((usd * fxRate) / 100) * 100 : null)
+  const fmtKhr = (usd: number) => {
+    const k = toKhr(usd)
+    return k === null ? "" : `៛${k.toLocaleString()}`
+  }
+
+  const discountRaw = Math.max(0, Number(discount) || 0)
   const discountAmount = discountMode === "%"
     ? (total * Math.min(100, discountRaw)) / 100
     : Math.min(total, discountRaw)
-  const discountPct    = discountMode === "%" ? Math.min(100, discountRaw) : (total > 0 ? (discountAmount / total) * 100 : 0)
-  const afterDiscount  = Math.max(0, total - discountAmount)
-  const taxPct         = taxEnabled ? Math.min(100, Math.max(0, Number(taxRate) || 0)) : 0
-  const taxAmount      = (afterDiscount * taxPct) / 100
+  const discountPct = discountMode === "%" ? Math.min(100, discountRaw) : (total > 0 ? (discountAmount / total) * 100 : 0)
+  const afterDiscount = Math.max(0, total - discountAmount)
+  const taxPct = taxEnabled ? Math.min(100, Math.max(0, Number(taxRate) || 0)) : 0
+  const taxAmount = (afterDiscount * taxPct) / 100
 
-  const preVipTotal       = afterDiscount + taxAmount
-  const vipDiscountPct    = vipCard && vipTier ? vipTier.discount : 0
+  const preVipTotal = afterDiscount + taxAmount
+  const vipDiscountPct = vipCard && vipTier ? vipTier.discount : 0
   const vipDiscountAmount = (preVipTotal * vipDiscountPct) / 100
-  const finalTotal        = Math.max(0, preVipTotal - vipDiscountAmount)
+  const finalTotal = Math.max(0, preVipTotal - vipDiscountAmount)
 
   const cashReceived = parseFloat(inputValue) || 0
-  const change       = selectedMethod === "cash" && cashReceived > 0 ? cashReceived - finalTotal : 0
-  const amountPaid   = selectedMethod === "cash" && cashReceived > 0 ? Math.min(cashReceived, finalTotal) : 0
-  const dueAmount    = selectedMethod === "cash" ? Math.max(0, finalTotal - amountPaid) : 0
+  const change = selectedMethod === "cash" && cashReceived > 0 ? cashReceived - finalTotal : 0
+  const amountPaid = selectedMethod === "cash" && cashReceived > 0 ? Math.min(cashReceived, finalTotal) : 0
+  const dueAmount = selectedMethod === "cash" ? Math.max(0, finalTotal - amountPaid) : 0
 
   const splitTotal = splitEntries.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
-  const splitDue   = Math.max(0, finalTotal - splitTotal)
-  const splitOver  = Math.max(0, splitTotal - finalTotal)
+  const splitDue = Math.max(0, finalTotal - splitTotal)
+  const splitOver = Math.max(0, splitTotal - finalTotal)
 
   const quickAmounts = [
     Math.ceil(finalTotal / 10) * 10,
@@ -203,7 +233,7 @@ export function CheckoutDialog({
   const handleNumpad = (key: string) => {
     const setter = payMode === "split"
       ? (fn: (v: string) => string) =>
-          setSplitEntries(prev => prev.map((e, i) => i === activeSplitIdx ? { ...e, amount: fn(e.amount) } : e))
+        setSplitEntries(prev => prev.map((e, i) => i === activeSplitIdx ? { ...e, amount: fn(e.amount) } : e))
       : (fn: (v: string) => string) => setInputValue(prev => fn(prev))
 
     if (key === "x") {
@@ -228,11 +258,34 @@ export function CheckoutDialog({
     setIsProcessing(true)
 
     const methodLabel = payMode === "split"
-    ? splitEntries
+      ? splitEntries
         .filter(e => (parseFloat(e.amount) || 0) > 0)
         .map(e => e.method)
         .join("+")
-    : selectedMethod
+      : selectedMethod
+
+    // ── Cash vs non-cash that actually stays with the shop ─────────
+    // Cash received minus change given back = what remains in the drawer,
+    // so the cash part of a split payment (cash+card) is never lost.
+    let cashAmount = 0
+    let nonCashAmount = 0
+
+    if (payMode === "split") {
+      const entered = splitEntries.filter(e => (parseFloat(e.amount) || 0) > 0)
+      const cashEntered = entered
+        .filter(e => e.method === "cash")
+        .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
+      const nonCashEntered = entered
+        .filter(e => e.method !== "cash")
+        .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
+
+      nonCashAmount = Math.min(nonCashEntered, finalTotal)
+      cashAmount = Math.min(cashEntered, Math.max(0, finalTotal - nonCashAmount))
+    } else if (selectedMethod === "cash") {
+      cashAmount = finalTotal          // the change goes back to the customer
+    } else {
+      nonCashAmount = finalTotal
+    }
 
     try {
       if (orderId) {
@@ -241,12 +294,25 @@ export function CheckoutDialog({
           methodLabel,
           vipCard?.id ?? null,
           {
-            discount_amount:     discountAmount,
-            tax_amount:          taxAmount,
+            discount_amount: discountAmount,
+            tax_amount: taxAmount,
             vip_discount_amount: vipDiscountAmount,
-            final_total:         finalTotal,
+            final_total: finalTotal,
+            cash_amount: Math.round(cashAmount * 100) / 100,
+            non_cash_amount: Math.round(nonCashAmount * 100) / 100,
           }
         )
+
+        // Save the cash / non-cash split so Close Shift counts it correctly.
+        // A failure here must never block the payment itself.
+        try {
+          await ordersApi.savePaymentSplit(orderId, {
+            cash_amount: Math.round(cashAmount * 100) / 100,
+            non_cash_amount: Math.round(nonCashAmount * 100) / 100,
+          })
+        } catch (e) {
+          console.warn("[checkout] could not save payment split:", e)
+        }
       }
       setIsComplete(true)
     } catch (error: any) {
@@ -279,7 +345,7 @@ export function CheckoutDialog({
       items,
       orderType,
       orderId,
-      subtotal:            total,
+      subtotal: total,
       discountAmount,
       discountMode,
       discountPct,
@@ -288,9 +354,9 @@ export function CheckoutDialog({
       taxAmount,
       finalTotal,
       itemDiscountTotal,
-      vipCode:             vipCode || undefined,
-      vipCardTierName:     vipTier?.name,
-      vipTierDiscount:     vipTier?.discount,
+      vipCode: vipCode || undefined,
+      vipCardTierName: vipTier?.name,
+      vipTierDiscount: vipTier?.discount,
       vipDiscountAmount,
       payMode,
       selectedMethod,
@@ -328,7 +394,7 @@ export function CheckoutDialog({
 
   const fillRemainingSplit = (idx: number) => {
     const others = splitEntries.reduce((s, e, i) => i === idx ? s : s + (parseFloat(e.amount) || 0), 0)
-    const rem    = Math.max(0, finalTotal - others)
+    const rem = Math.max(0, finalTotal - others)
     setSplitEntries(prev => prev.map((e, i) => i === idx ? { ...e, amount: rem.toFixed(2) } : e))
   }
 
@@ -341,7 +407,7 @@ export function CheckoutDialog({
       {itemDiscountTotal > 0 && (
         <div className="flex justify-between text-[13px]">
           <span className="text-gray-500">{isKh ? "បញ្ចុះតម្លៃទំនិញ" : "Item discounts"}</span>
-          <span className="font-medium text-emerald-600">−${itemDiscountTotal.toFixed(2)}</span>
+          <span className="font-medium text-[#03624C]">−${itemDiscountTotal.toFixed(2)}</span>
         </div>
       )}
       {discountAmount > 0 && (
@@ -352,13 +418,13 @@ export function CheckoutDialog({
               {discountMode === "%" ? `(${discountPct % 1 === 0 ? discountPct.toFixed(0) : discountPct.toFixed(1)}%)` : `($${discountAmount.toFixed(2)})`}
             </span>
           </span>
-          <span className="font-medium text-amber-600">−${discountAmount.toFixed(2)}</span>
+          <span className="font-medium text-[#1857D8]">−${discountAmount.toFixed(2)}</span>
         </div>
       )}
       {taxEnabled && taxPct > 0 && (
         <div className="flex justify-between text-[13px]">
           <span className="text-gray-500">Tax <span className="text-gray-400">({taxPct}%)</span></span>
-          <span className="font-medium text-blue-600">+${taxAmount.toFixed(2)}</span>
+          <span className="font-medium text-[#1857D8]">+${taxAmount.toFixed(2)}</span>
         </div>
       )}
       {vipCard && vipTier && vipDiscountAmount > 0 && (
@@ -375,8 +441,20 @@ export function CheckoutDialog({
         <span className="text-[13px] font-semibold text-gray-800">{isKh ? "សរុបត្រូវបង់" : "Total due"}</span>
         <span className="font-black text-[22px] text-gray-900 tracking-tight">${finalTotal.toFixed(2)}</span>
       </div>
+      {fxRate && (
+        <div className="flex items-center justify-between text-[12px] text-gray-500">
+          <span className="flex items-center gap-1.5">
+            {isKh ? "ជារៀល" : "In Riel"}
+            <span className="text-[10px] text-gray-400">
+              ($1 = ៛{fxRate.toLocaleString()}
+              {fxMode ? ` · ${fxMode === "auto" ? "NBC" : isKh ? "ដោយដៃ" : "Manual"}` : ""})
+            </span>
+          </span>
+          <span className="font-bold text-[14px] text-gray-800">{fmtKhr(finalTotal)}</span>
+        </div>
+      )}
       {(itemDiscountTotal + discountAmount + vipDiscountAmount) > 0 && (
-        <div className="flex items-center justify-between text-[11px] text-emerald-600 font-semibold bg-emerald-50 rounded-lg px-2.5 py-1.5 mt-1">
+        <div className="flex items-center justify-between text-[11px] text-[#03624C] font-semibold bg-[#03624C]/[0.06] rounded-lg px-2.5 py-1.5 mt-1">
           <span>{isKh ? "សន្សំបាន" : "You saved"}</span>
           <span>${(itemDiscountTotal + discountAmount + vipDiscountAmount).toFixed(2)}</span>
         </div>
@@ -446,6 +524,9 @@ export function CheckoutDialog({
                   className="text-[26px] font-black text-[#03624C] tracking-tight" >
                   ${finalTotal.toFixed(2)}
                 </motion.p>
+                {fxRate && (
+                  <p className="text-[13px] font-semibold text-gray-500">≈ {fmtKhr(finalTotal)}</p>
+                )}
               </motion.div>
               <motion.button
                 initial={{ opacity: 0, y: 8 }}
@@ -487,6 +568,11 @@ export function CheckoutDialog({
                     className="text-[22px] font-black text-[#03624C] leading-tight tracking-tight" >
                     ${finalTotal.toFixed(2)}
                   </motion.p>
+                  {fxRate && (
+                    <p className="text-[12px] font-semibold text-gray-500 leading-tight mt-0.5">
+                      ≈ {fmtKhr(finalTotal)}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="px-6 py-4 space-y-4 overflow-y-auto">
@@ -515,7 +601,7 @@ export function CheckoutDialog({
                               }}
                               className={cn(
                                 "px-1.5 py-0.5 text-[10px] font-bold transition-all",
-                                discountMode === mode ? "bg-amber-500 text-white" : "text-gray-400 hover:bg-gray-50"
+                                discountMode === mode ? "bg-[#03624C] text-white" : "text-gray-400 hover:bg-gray-50"
                               )} >
                               {mode}
                             </button>
@@ -532,7 +618,7 @@ export function CheckoutDialog({
                     </div>
                     {editingDiscount ? (
                       <div className="flex items-center gap-1">
-                        {discountMode === "$" && <span className="text-[15px] font-bold text-amber-500">$</span>}
+                        {discountMode === "$" && <span className="text-[15px] font-bold text-[#03624C]">$</span>}
                         <input
                           autoFocus type="number" min={0}
                           max={discountMode === "%" ? 100 : total} step="0.01"
@@ -543,10 +629,10 @@ export function CheckoutDialog({
                             if (e.key === "Enter") { setDiscount((Number(discountInput) || 0).toString()); setEditingDiscount(false) }
                             if (e.key === "Escape") setEditingDiscount(false)
                           }}
-                          className="w-full text-[15px] font-bold bg-transparent border-none outline-none text-amber-700"
+                          className="w-full text-[15px] font-bold bg-transparent border-none outline-none text-[#03624C]"
                           placeholder="0"
                         />
-                        {discountMode === "%" && <span className="text-[15px] font-bold text-amber-400">%</span>}
+                        {discountMode === "%" && <span className="text-[15px] font-bold text-[#03624C]">%</span>}
                       </div>
                     ) : (
                       <button
@@ -554,7 +640,7 @@ export function CheckoutDialog({
                         className="text-left w-full" >
                         {discountAmount > 0 ? (
                           <div className="flex items-baseline gap-1.5">
-                            <span className="text-[17px] font-black text-amber-600">
+                            <span className="text-[17px] font-black text-[#03624C]">
                               {discountMode === "%" ? `${discountPct % 1 === 0 ? discountPct.toFixed(0) : discountPct.toFixed(1)}%` : `$${discountAmount.toFixed(2)}`}
                             </span>
                             <span className="text-[11px] text-gray-400">
@@ -577,7 +663,7 @@ export function CheckoutDialog({
                       </span>
                       <button
                         onClick={() => setTaxEnabled(v => !v)}
-                        className={cn("w-7 h-4 rounded-full transition-all relative shrink-0", taxEnabled ? "bg-blue-500" : "bg-gray-200")} >
+                        className={cn("w-7 h-4 rounded-full transition-all relative shrink-0", taxEnabled ? "bg-[#1857D8]" : "bg-gray-200")} >
                         <motion.span
                           className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm"
                           animate={{ left: taxEnabled ? 14 : 2 }}
@@ -597,14 +683,14 @@ export function CheckoutDialog({
                               if (e.key === "Enter") { setTaxRate(Math.min(100, Math.max(0, Number(taxInput) || 0)).toString()); setEditingTax(false) }
                               if (e.key === "Escape") setEditingTax(false)
                             }}
-                            className="w-full text-[15px] font-bold bg-transparent border-none outline-none text-blue-700"
+                            className="w-full text-[15px] font-bold bg-transparent border-none outline-none text-[#1857D8]"
                             placeholder="10"
                           />
-                          <span className="text-[15px] font-bold text-blue-400">%</span>
+                          <span className="text-[15px] font-bold text-[#1857D8]">%</span>
                         </div>
                       ) : (
                         <button onClick={() => { setTaxInput(taxRate); setEditingTax(true) }} className="text-left w-full">
-                          <span className="text-[17px] font-black text-blue-600">{taxPct}%</span>
+                          <span className="text-[17px] font-black text-[#1857D8]">{taxPct}%</span>
                           <span className="text-[11px] text-gray-400 ml-1.5">+${taxAmount.toFixed(2)}</span>
                         </button>
                       )
@@ -616,8 +702,8 @@ export function CheckoutDialog({
                 <div className="rounded-lg border border-gray-200 px-3.5 py-1 max-h-[140px] overflow-y-auto">
                   {items.map((item, i) => {
                     const origPrice = item.original_price ?? item.price
-                    const hasDisc   = item.original_price && item.original_price > item.price
-                    const discAmt   = hasDisc ? (item.original_price! - item.price) * item.quantity : 0
+                    const hasDisc = item.original_price && item.original_price > item.price
+                    const discAmt = hasDisc ? (item.original_price! - item.price) * item.quantity : 0
                     const discLabel = item.discount
                       ? item.discount.value_type === "percentage"
                         ? `${item.discount.name} −${item.discount.value}%`
@@ -635,13 +721,13 @@ export function CheckoutDialog({
                                 ${(origPrice * item.quantity).toFixed(2)}
                               </span>
                             )}
-                            <span className={cn("block text-[12.5px] font-semibold", hasDisc ? "text-emerald-600" : "text-gray-800")}>
+                            <span className={cn("block text-[12.5px] font-semibold", hasDisc ? "text-[#03624C]" : "text-gray-800")}>
                               ${(item.price * item.quantity).toFixed(2)}
                             </span>
                           </div>
                         </div>
                         {hasDisc && (
-                          <p className="text-[10px] text-emerald-500 mt-0.5">
+                          <p className="text-[10px] text-[#03624C] mt-0.5">
                             {discLabel} · −${discAmt.toFixed(2)}
                           </p>
                         )}
@@ -755,7 +841,7 @@ export function CheckoutDialog({
                       <div className="grid grid-cols-3 gap-2">
                         {paymentMethods.map(m => {
                           const Icon = m.icon
-                          const sel  = selectedMethod === m.id
+                          const sel = selectedMethod === m.id
                           return (
                             <motion.button key={m.id} whileTap={{ scale: 0.95 }} onClick={() => setSelectedMethod(m.id)}
                               className={cn(
@@ -776,6 +862,9 @@ export function CheckoutDialog({
                             <p className="text-[30px] font-black text-gray-900 tracking-tight min-h-[40px]">
                               {inputValue ? `$${inputValue}` : <span className="text-gray-300">$0</span>}
                             </p>
+                            {fxRate && cashReceived > 0 && (
+                              <p className="text-[12px] font-semibold text-gray-500">≈ {fmtKhr(cashReceived)}</p>
+                            )}
                           </div>
                           <div className="grid grid-cols-4 gap-2">
                             {quickAmounts.map(amt => (
@@ -786,7 +875,7 @@ export function CheckoutDialog({
                             ))}
                           </div>
                           <div className="grid grid-cols-3 gap-2">
-                            {["1","2","3","4","5","6","7","8","9",".","0","x"].map(k => (
+                            {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "x"].map(k => (
                               <motion.button key={k} whileTap={{ scale: 0.9 }} onClick={() => handleNumpad(k)}
                                 className={cn("py-3 rounded-lg text-[15px] font-semibold transition-colors",
                                   k === "x" ? "text-rose-500 hover:bg-rose-50" : "text-gray-700 bg-gray-50 hover:bg-gray-100")}>
@@ -819,7 +908,12 @@ export function CheckoutDialog({
                                   animate={{ opacity: 1, y: 0 }}
                                   className="flex justify-between items-baseline" >
                                   <span className="text-[13px] font-semibold text-[#03624C]">{isKh ? "ប្រាក់អាប់" : "Change"}</span>
-                                  <span className="font-black text-[18px] text-[#03624C]">${change.toFixed(2)}</span>
+                                  <span className="text-right">
+                                    <span className="block font-black text-[18px] text-[#03624C]">${change.toFixed(2)}</span>
+                                    {fxRate && (
+                                      <span className="block text-[11px] font-semibold text-gray-500">≈ {fmtKhr(change)}</span>
+                                    )}
+                                  </span>
                                 </motion.div>
                               )}
                             </div>
@@ -849,7 +943,7 @@ export function CheckoutDialog({
                         <AnimatePresence initial={false}>
                           {splitEntries.map((entry, idx) => {
                             const isActive = activeSplitIdx === idx
-                            const color    = METHOD_COLORS[entry.method]
+                            const color = METHOD_COLORS[entry.method]
                             return (
                               <motion.div key={idx}
                                 layout
@@ -865,7 +959,7 @@ export function CheckoutDialog({
                                   <div className="flex gap-1.5">
                                     {paymentMethods.map(m => {
                                       const Icon = m.icon
-                                      const sel  = entry.method === m.id
+                                      const sel = entry.method === m.id
                                       return (
                                         <motion.button key={m.id} whileTap={{ scale: 0.9 }}
                                           onClick={e => { e.stopPropagation(); updateSplitMethod(idx, m.id) }}
@@ -912,7 +1006,7 @@ export function CheckoutDialog({
                         )}
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        {["1","2","3","4","5","6","7","8","9",".","0","x"].map(k => (
+                        {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "x"].map(k => (
                           <motion.button key={k} whileTap={{ scale: 0.9 }} onClick={() => handleNumpad(k)}
                             className={cn("py-3 rounded-lg text-[15px] font-semibold transition-colors",
                               k === "x" ? "text-rose-500 hover:bg-rose-50" : "text-gray-700 bg-gray-50 hover:bg-gray-100")}>
@@ -931,8 +1025,13 @@ export function CheckoutDialog({
                             <span className={cn("text-[13px] font-semibold", splitDue > 0 ? "text-rose-500" : "text-[#03624C]")}>
                               {isKh ? "ប្រាក់ខ្វះ" : "Remaining"}
                             </span>
-                            <span className={cn("font-black text-[16px]", splitDue > 0 ? "text-rose-500" : "text-[#03624C]")}>
-                              ${splitDue.toFixed(2)}
+                            <span className="text-right">
+                              <span className={cn("block font-black text-[16px]", splitDue > 0 ? "text-rose-500" : "text-[#03624C]")}>
+                                ${splitDue.toFixed(2)}
+                              </span>
+                              {fxRate && splitDue > 0 && (
+                                <span className="block text-[11px] font-semibold text-gray-500">≈ {fmtKhr(splitDue)}</span>
+                              )}
                             </span>
                           </div>
                         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Loader2, Utensils, CreditCard, Printer, LogOut } from "lucide-react";
+import { Loader2, Utensils, CreditCard, Printer, LogOut, ArrowLeftRight, Link2 } from "lucide-react";
 import { printBill } from "@/components/pos/print-bill";
 import type { CartItem } from "./pos-type";
 
@@ -22,6 +22,11 @@ interface OrderFooterProps {
   showPay: boolean;
   showCheckOut: boolean;
   isSendingPreOrder: boolean;
+  isSendingKitchen?: boolean;      // NEW
+  isConfirmingAdditional?: boolean; // NEW
+  showTableActions?: boolean;       // NEW: show Transfer / Merge
+  onTransferTable?: () => void;     // NEW
+  onMergeTable?: () => void;        // NEW
   onGuestArrived: () => void;
   onCancelReservation: () => void;
   onConfirmPreOrder: () => void;
@@ -36,27 +41,32 @@ export function OrderFooter({
   items, orderType, orderId, systemName, systemLogo,
   isReserved, showPreOrderConfirm, showConfirm, showConfirmAdditional,
   showPay, showCheckOut, isSendingPreOrder,
+  isSendingKitchen = false, isConfirmingAdditional = false,
+  showTableActions = false, onTransferTable, onMergeTable,
   onGuestArrived, onCancelReservation, onConfirmPreOrder,
   onConfirmKitchen, onConfirmAdditional, onOpenCheckout, onCheckOut,
 }: OrderFooterProps) {
   const subtotal = orderTotal + pendingTotal + discountTotal;
-  const total    = orderTotal + pendingTotal;
+  const total = orderTotal + pendingTotal;
 
   const handlePrintBill = () => {
-    printBill({
-      items, orderType, orderId,
-      subtotal,
-      discountAmount:    discountTotal,
-      discountMode:      "$",
-      discountPct:       0,
-      taxEnabled:        false,
-      taxPct:            0,
-      taxAmount:         0,
-      finalTotal:        total,
-      itemDiscountTotal: discountTotal,
-      systemName,
-      systemLogo,
-    });
+    // run after the UI paints so the button never freezes
+    setTimeout(() => {
+      printBill({
+        items, orderType, orderId,
+        subtotal,
+        discountAmount: discountTotal,
+        discountMode: "$",
+        discountPct: 0,
+        taxEnabled: false,
+        taxPct: 0,
+        taxAmount: 0,
+        finalTotal: total,
+        itemDiscountTotal: discountTotal,
+        systemName,
+        systemLogo,
+      });
+    }, 0);
   };
 
   return (
@@ -79,6 +89,21 @@ export function OrderFooter({
         <span className="text-[22px] font-black text-gray-900">${total.toFixed(2)}</span>
       </div>
 
+      {showTableActions && (
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onTransferTable}
+            className="h-9 rounded-lg text-[13px] font-bold flex items-center justify-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors">
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            {isKh ? "ប្តូរតុ" : "Transfer"}
+          </button>
+          <button onClick={onMergeTable}
+            className="h-9 rounded-lg text-[13px] font-bold flex items-center justify-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors">
+            <Link2 className="w-3.5 h-3.5" />
+            {isKh ? "បញ្ចូលតុ" : "Merge"}
+          </button>
+        </div>
+      )}
+
       {isReserved && (
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onGuestArrived} className="h-10 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[14px] font-bold transition-colors">
@@ -99,17 +124,17 @@ export function OrderFooter({
       )}
 
       {showConfirm && (
-        <motion.button whileTap={{ scale: 0.97 }} onClick={onConfirmKitchen}
-          className="w-full h-11 rounded-lg text-[14px] font-bold flex items-center justify-center gap-2 bg-[#03624C] hover:bg-[#024a38] text-white transition-all">
-          <Utensils className="w-4 h-4" />
+        <motion.button whileTap={{ scale: 0.97 }} onClick={onConfirmKitchen} disabled={isSendingKitchen}
+          className="w-full h-11 rounded-lg text-[14px] font-bold flex items-center justify-center gap-2 bg-[#03624C] hover:bg-[#024a38] disabled:opacity-60 text-white transition-all">
+          {isSendingKitchen ? <Loader2 className="w-4 h-4 animate-spin" /> : <Utensils className="w-4 h-4" />}
           {isKh ? "បញ្ជូនទៅផ្ទះបាយ" : "Send to Kitchen"}
         </motion.button>
       )}
 
       {showConfirmAdditional && (
-        <motion.button whileTap={{ scale: 0.97 }} onClick={onConfirmAdditional}
-          className="w-full h-10 rounded-lg text-[14px] font-bold flex items-center justify-center gap-1.5 bg-[#1857D8] hover:bg-[#1448b0] text-white transition-all">
-          <Printer className="w-3.5 h-3.5" />
+        <motion.button whileTap={{ scale: 0.97 }} onClick={onConfirmAdditional} disabled={isConfirmingAdditional}
+          className="w-full h-10 rounded-lg text-[14px] font-bold flex items-center justify-center gap-1.5 bg-[#1857D8] hover:bg-[#1448b0] disabled:opacity-60 text-white transition-all">
+          {isConfirmingAdditional ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
           {isKh ? "ទទួលការកម្ម៉ង" : "Confirm Order"}
         </motion.button>
       )}
@@ -124,7 +149,7 @@ export function OrderFooter({
           <motion.button whileTap={{ scale: 0.97 }} onClick={onOpenCheckout}
             className="h-10 rounded-lg text-[14px] font-bold flex items-center justify-center gap-1.5 bg-[#03624C] hover:bg-[#024a38] text-white transition-all">
             <CreditCard className="w-3.5 h-3.5" />
-            {isKh ? "Bill & Payment" : "Bill & Payment"}
+            Bill & Payment
           </motion.button>
         </div>
       )}

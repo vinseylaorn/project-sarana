@@ -24,9 +24,10 @@ use App\Http\Controllers\Api\Report\ReportController;
 use App\Http\Controllers\Api\Setting\RoleController;
 use App\Http\Controllers\Api\Setting\UserController;
 use App\Http\Controllers\Api\Setting\StaffController;
-use App\Http\Controllers\Api\Setting\SystemsettingController;
+use App\Http\Controllers\Api\Setting\SystemSettingController;
 use App\Http\Controllers\Api\Setting\PrinterController;
 use App\Http\Controllers\Api\Setting\WorkingShiftController;
+use App\Http\Controllers\Api\Setting\NbcRateController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public Routes ─────────────────────────────────────────────────
@@ -43,6 +44,9 @@ Route::post('/pos/open-shift', [PosShiftController::class, 'openShift']);
 // ── POS Protected — pos_token cookie ─────────────────────────────
 Route::prefix('pos')->middleware('pos.auth')->group(function () {
     Route::get ('/tables',                                  [RestaurantTableController::class, 'index']);
+    Route::post('/tables/merge',                            [RestaurantTableController::class, 'merge']);
+    Route::post('/tables/transfer',                         [RestaurantTableController::class, 'transfer']);
+    Route::get ('/tables/{table}/order',                    [RestaurantTableController::class, 'order']);   // ✅ NEW: order រួមរបស់តុ (merged ឬធម្មតា)
     Route::put ('/tables/{table}/status',                   [RestaurantTableController::class, 'updateStatus']);
     Route::get ('/menu-items',                              [MenuItemController::class,        'index']);
     Route::get ('/menu-categories',                         [MenuCategoryController::class,    'index']);
@@ -53,7 +57,11 @@ Route::prefix('pos')->middleware('pos.auth')->group(function () {
     Route::post('/orders',                                  [OrderController::class,           'store']);
     Route::put ('/orders/{order}/items',                    [OrderController::class,           'updateItems']);
     Route::put ('/orders/{order}/complete',                 [OrderController::class,           'complete']);
+    Route::put ('/orders/{order}/cancel',                   [OrderController::class,           'cancel']);
+    Route::put ('/orders/{order}/payment-split',            [PosShiftController::class,        'savePaymentSplit']);
     Route::post('/stock-history',                           [StockHistoryController::class,    'store']);
+    Route::get ('/exchange-rate',                           [PosShiftController::class,        'currentRate']);
+    Route::get ('/close-shift-preview/{shift}',             [PosShiftController::class,        'closeShiftPreview']);
     Route::post('/close-shift/{shift}',                     [PosShiftController::class,        'closeShift']);
     Route::get ('/vip/cards/lookup',                        [VipCardController::class,         'lookup']);
 });
@@ -140,12 +148,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/menu-items/{menuItem}', [MenuItemController::class, 'destroy'])->middleware('permission:menu,delete');
 
     // ── Tables ────────────────────────────────────────────────────
-    Route::get   ('/tables',              [RestaurantTableController::class, 'index'])       ->middleware('permission:tables,view');
-    Route::post  ('/tables',              [RestaurantTableController::class, 'store'])       ->middleware('permission:tables,create');
-    Route::get   ('/tables/{table}',      [RestaurantTableController::class, 'show'])        ->middleware('permission:tables,view');
-    Route::put   ('/tables/{table}',      [RestaurantTableController::class, 'update'])      ->middleware('permission:tables,edit');
-    Route::delete('/tables/{table}',      [RestaurantTableController::class, 'destroy'])     ->middleware('permission:tables,delete');
-    Route::put   ('/tables/{table}/status',[RestaurantTableController::class, 'updateStatus'])->middleware('permission:tables,edit');
+    // ⚠️ merge / transfer ត្រូវនៅមុន /tables/{table} ដើម្បីកុំឱ្យ conflict
+    Route::post  ('/tables/merge',          [RestaurantTableController::class, 'merge'])       ->middleware('permission:tables,edit');
+    Route::post  ('/tables/transfer',       [RestaurantTableController::class, 'transfer'])    ->middleware('permission:tables,edit');
+    Route::get   ('/tables',                [RestaurantTableController::class, 'index'])       ->middleware('permission:tables,view');
+    Route::post  ('/tables',                [RestaurantTableController::class, 'store'])       ->middleware('permission:tables,create');
+    Route::get   ('/tables/{table}',        [RestaurantTableController::class, 'show'])        ->middleware('permission:tables,view');
+    Route::get   ('/tables/{table}/order',  [RestaurantTableController::class, 'order'])       ->middleware('permission:tables,view');   // ✅ NEW
+    Route::put   ('/tables/{table}',        [RestaurantTableController::class, 'update'])      ->middleware('permission:tables,edit');
+    Route::delete('/tables/{table}',        [RestaurantTableController::class, 'destroy'])     ->middleware('permission:tables,delete');
+    Route::put   ('/tables/{table}/status', [RestaurantTableController::class, 'updateStatus'])->middleware('permission:tables,edit');
 
     // ── Orders ────────────────────────────────────────────────────
     Route::get ('/orders',                  [OrderController::class, 'index'])      ->middleware('permission:orders,view');
@@ -153,6 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get ('/orders/{order}',          [OrderController::class, 'show'])       ->middleware('permission:orders,view');
     Route::put ('/orders/{order}/items',    [OrderController::class, 'updateItems'])->middleware('permission:orders,edit');
     Route::put ('/orders/{order}/complete', [OrderController::class, 'complete'])   ->middleware('permission:orders,edit');
+    Route::put ('/orders/{order}/cancel',   [OrderController::class, 'cancel'])     ->middleware('permission:orders,edit');
 
     // ── Discounts ─────────────────────────────────────────────────
     Route::get   ('/discounts',            [DiscountController::class, 'index'])  ->middleware('permission:discount,view');
@@ -189,6 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/dashboard', [ReportController::class, 'dashboard'])->middleware('permission:reports,view');
     Route::get('/reports/export',    [ReportController::class, 'export'])    ->middleware('permission:reports,view');
     Route::get('/reports/shifts',    [ReportController::class, 'shifts'])    ->middleware('permission:reports,view');
+    Route::get('/reports/inventory', [ReportController::class, 'inventory'])->middleware('permission:reports,view');
 
     // ── Working Shifts ────────────────────────────────────────────
     Route::prefix('working-shifts')->group(function () {
@@ -209,9 +223,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch ('/reservations/{reservation}/table-status',  [ReservationController::class, 'updateTableStatus'])->middleware('permission:reserved,edit');
 
     // ── System Settings ───────────────────────────────────────────
-    Route::get   ('/system-settings',      [SystemsettingController::class, 'show'])      ->middleware('permission:settings,view');
-    Route::put   ('/system-settings',      [SystemsettingController::class, 'update'])    ->middleware('permission:settings,edit');
-    Route::delete('/system-settings/logo', [SystemsettingController::class, 'removeLogo'])->middleware('permission:settings,edit');
+    Route::get('/system-settings/nbc-rate', [NbcRateController::class, 'show'])
+        ->middleware(['permission:settings,view', 'throttle:20,1']);
+    Route::get   ('/system-settings',      [SystemSettingController::class, 'show'])      ->middleware('permission:settings,view');
+    Route::put   ('/system-settings',      [SystemSettingController::class, 'update'])    ->middleware('permission:settings,edit');
+    Route::delete('/system-settings/logo', [SystemSettingController::class, 'removeLogo'])->middleware('permission:settings,edit');
 
     // ── VIP Card Management ───────────────────────────────────────
     Route::prefix('vip')->group(function () {
@@ -238,7 +254,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post  ('/',               [PrinterController::class, 'store'])         ->middleware('permission:settings,create');
         Route::put   ('/{printer}',      [PrinterController::class, 'update'])        ->middleware('permission:settings,edit');
         Route::delete('/{printer}',      [PrinterController::class, 'destroy'])       ->middleware('permission:settings,delete');
-        Route::post  ('/scan',           [PrinterController::class, 'scan'])          ->middleware('permission:settings,view');
+        Route::post  ('/scan',           [PrinterController::class, 'scan'])          ->middleware('permission:settings,edit');
         Route::post  ('/scan/save',      [PrinterController::class, 'saveScanResult'])->middleware('permission:settings,edit');
         Route::post  ('/{printer}/ping', [PrinterController::class, 'ping'])          ->middleware('permission:settings,view');
     });

@@ -10,10 +10,10 @@ import { LayoutGrid } from "lucide-react"
 const SORA: React.CSSProperties = { fontFamily: "'Sora', sans-serif" }
 
 interface GoToAdminDialogProps {
-  isKh:         boolean
-  open:         boolean
+  isKh: boolean
+  open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm:    () => void
+  onConfirm: () => void
 }
 
 export function GoToAdminDialog({ isKh, open, onOpenChange, onConfirm }: GoToAdminDialogProps) {
@@ -22,7 +22,6 @@ export function GoToAdminDialog({ isKh, open, onOpenChange, onConfirm }: GoToAdm
       <AlertDialogContent
         className="rounded-2xl border-0 bg-white dark:bg-[#22263a] shadow-2xl p-0 max-w-[400px] overflow-hidden"
         style={SORA} >
-        <div className="h-1 w-full bg-gradient-to-r from-[#03624C] to-[#059669] dark:from-[#1857D8] dark:to-[#1857D8]/60" />
         <div className="p-6">
           <div className="flex items-start gap-4 mb-4">
             <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-[#03624C]/[0.08]

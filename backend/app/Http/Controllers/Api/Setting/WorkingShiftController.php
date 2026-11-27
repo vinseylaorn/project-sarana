@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Setting;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
 use App\Models\WorkingShift;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,40 +86,8 @@ class WorkingShiftController extends Controller
         }
     }
 
-    public function closeShift(Request $request, WorkingShift $workingShift): JsonResponse
-    {
-        $data = $request->validate([
-            'close_amount_usd' => 'nullable|numeric|min:0',
-            'close_amount_khr' => 'nullable|numeric|min:0',
-            'note'             => 'nullable|string|max:500',
-        ]);
-
-        try {
-            // គណនា orders ពី database ផ្ទាល់ — column: working_shift_id
-            $orders = Order::where('working_shift_id', $workingShift->id)
-                        ->where('status', 'completed')
-                        ->get();
-
-            $totalUsd = (float) $orders->sum('total');
-            $totalKhr = (float) ($totalUsd * 4100);
-
-            $workingShift->update([
-                'close_amount_usd'  => $data['close_amount_usd'] ?? 0,
-                'close_amount_khr'  => $data['close_amount_khr'] ?? 0,
-                'close_time'        => now(),
-                'shift_status'      => 'Closed',
-                'total_orders'      => $orders->count(),
-                'total_revenue_usd' => $totalUsd,
-                'total_revenue_khr' => $totalKhr,
-                'note'              => $data['note'] ?? $workingShift->note,
-            ]);
-
-            $workingShift->load('staff:id,name,position,image');
-            return response()->json($this->format($workingShift));
-        } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
-    }
+    // NOTE: closing a shift is done from the POS (PosShiftController::closeShift),
+    // which uses the exchange rate from System Settings and counts CASH only.
 
     public function destroy(WorkingShift $workingShift): JsonResponse
     {
@@ -160,32 +127,40 @@ class WorkingShiftController extends Controller
     private function format(WorkingShift $shift): array
     {
         $staff = $shift->staff;
+
+        // Reconciliation saved when the shift was closed from the POS.
+        // null = shift is still open, or it was closed before this feature existed.
+        $expected   = $shift->expected_cash_usd;
+        $difference = $shift->cash_difference_usd;
+
         return [
-            'id'                 => $shift->id,
-            'staff_id'           => $shift->staff_id,
-            'staff_name'         => $staff?->name,
-            'staff_position'     => $staff?->position,
-            'staff_image'        => $this->imageUrl($staff?->image),
-            'date'               => $shift->date?->format('Y-m-d'),
-            'shift_type'         => $shift->shift_type,
-            'start_time'         => $shift->start_time,
-            'end_time'           => $shift->end_time,
-            'status'             => $shift->status,
-            'shift_status'       => $shift->shift_status ?? 'Closed',
-            'open_time'          => $shift->open_time?->format('d/m/Y H:i A'),
-            'open_time_raw'      => $shift->open_time?->toISOString(),
-            'open_amount_usd'    => (float) $shift->open_amount_usd,
-            'open_amount_khr'    => (float) $shift->open_amount_khr,
-            'close_time'         => $shift->close_time?->format('d/m/Y H:i A'),
-            'close_time_raw'     => $shift->close_time?->toISOString(),
-            'close_amount_usd'   => (float) $shift->close_amount_usd,
-            'close_amount_khr'   => (float) $shift->close_amount_khr,
-            'total_orders'       => (int) $shift->total_orders,
-            'total_revenue_usd'  => (float) $shift->total_revenue_usd,
-            'total_revenue_khr'  => (float) $shift->total_revenue_khr,
-            'overtime_hours'     => (float) $shift->overtime_hours,
-            'note'               => $shift->note,
-            'created_at'         => $shift->created_at?->toISOString(),
+            'id'                  => $shift->id,
+            'staff_id'            => $shift->staff_id,
+            'staff_name'          => $staff?->name,
+            'staff_position'      => $staff?->position,
+            'staff_image'         => $this->imageUrl($staff?->image),
+            'date'                => $shift->date?->format('Y-m-d'),
+            'shift_type'          => $shift->shift_type,
+            'start_time'          => $shift->start_time,
+            'end_time'            => $shift->end_time,
+            'status'              => $shift->status,
+            'shift_status'        => $shift->shift_status ?? 'Closed',
+            'open_time'           => $shift->open_time?->format('d/m/Y H:i A'),
+            'open_time_raw'       => $shift->open_time?->toISOString(),
+            'open_amount_usd'     => (float) $shift->open_amount_usd,
+            'open_amount_khr'     => (float) $shift->open_amount_khr,
+            'close_time'          => $shift->close_time?->format('d/m/Y H:i A'),
+            'close_time_raw'      => $shift->close_time?->toISOString(),
+            'close_amount_usd'    => (float) $shift->close_amount_usd,
+            'close_amount_khr'    => (float) $shift->close_amount_khr,
+            'total_orders'        => (int) $shift->total_orders,
+            'total_revenue_usd'   => (float) $shift->total_revenue_usd,
+            'total_revenue_khr'   => (float) $shift->total_revenue_khr,
+            'expected_cash_usd'   => $expected   !== null ? (float) $expected   : null,
+            'cash_difference_usd' => $difference !== null ? (float) $difference : null,
+            'overtime_hours'      => (float) $shift->overtime_hours,
+            'note'                => $shift->note,
+            'created_at'          => $shift->created_at?->toISOString(),
         ];
     }
 

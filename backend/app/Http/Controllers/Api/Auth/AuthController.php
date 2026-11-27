@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -118,7 +119,7 @@ class AuthController extends Controller
         $request->validate([
             'email'                     => 'required|email',
             'otp'                       => 'required|string|size:6',
-            'new_password'              => 'required|string|min:6',
+            'new_password'              => ['required', 'string', $this->strongPassword()],
             'new_password_confirmation' => 'required|same:new_password',
         ]);
 
@@ -138,9 +139,6 @@ class AuthController extends Controller
 
         $user->update(['password' => Hash::make($request->new_password)]);
 
-        // Password reset is a genuine security event — a stranger may have
-        // had access to this account, so we sign out every browser/device
-        // on purpose here. This is the one place tokens()->delete() stays.
         $user->tokens()->delete();
 
         \Cache::forget('otp_' . $request->email);
@@ -158,7 +156,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'current_password'          => 'required|string',
-            'new_password'              => 'required|string|min:6|different:current_password',
+            'new_password'              => ['required', 'string', 'different:current_password', $this->strongPassword()],
             'new_password_confirmation' => 'required|same:new_password',
         ]);
 
@@ -176,5 +174,14 @@ class AuthController extends Controller
         $user->tokens()->where('id', '!=', $request->user()->currentAccessToken()->id)->delete();
 
         return response()->json(['message' => 'Password changed successfully.']);
+    }
+
+    private function strongPassword(): Password
+    {
+        return Password::min(8)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols();
     }
 }

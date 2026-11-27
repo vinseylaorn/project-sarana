@@ -94,7 +94,8 @@ function formatDateParts(dateStr: string | null | undefined): { date: string; ti
 export default function StockCategoriesPage() {
    const { i18n } = useTranslation("common")
    const isKh = i18n.language === "kh"
-   const { can } = usePermission("inventory")
+   // FIX: key ផ្ទាល់ខ្លួន (ធ្លាក់ទៅ "inventory" ស្វ័យប្រវត្តិបើ nav មិនមាន key នេះ)
+   const { can } = usePermission("inventory-categories")
 
    const { data: categories = [], isLoading: loadingCategories } = useStockCategories()
    const { data: inventoryItems = [], isLoading: loadingItems } = useInventory()
@@ -176,7 +177,7 @@ export default function StockCategoriesPage() {
          }
          setIsDialogOpen(false)
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
       }
    }
 
@@ -203,7 +204,7 @@ export default function StockCategoriesPage() {
          setCurrentCat(null)
          setDeleteCounts({ items: 0, suppliers: 0 })
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "លុបមិនបាន" : "Failed to delete"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "លុបមិនបាន" : "Failed to delete"))
       }
    }
 
@@ -221,7 +222,7 @@ export default function StockCategoriesPage() {
          return true
       })
       if (sortConfig.key) {
-         result.sort((a: any, b: any) => {
+         result = [...result].sort((a: any, b: any) => {
             const dir = sortConfig.direction === "asc" ? 1 : -1
             return a[sortConfig.key!] < b[sortConfig.key!] ? -dir : a[sortConfig.key!] > b[sortConfig.key!] ? dir : 0
          })
@@ -261,6 +262,17 @@ export default function StockCategoriesPage() {
       })),
    ]
 
+   const dateCell = (raw?: string | null) => {
+      const p = formatDateParts(raw)
+      if (!p) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
+      return (
+         <div className="flex flex-col gap-0.5">
+            <span className="text-[14px] text-gray-700 dark:text-white/70">{p.date}</span>
+            <span className="text-[12px] text-gray-600 dark:text-white/30">{p.time}</span>
+         </div>
+      )
+   }
+
    const columns = [
       {
          key: "no",
@@ -276,36 +288,16 @@ export default function StockCategoriesPage() {
          header: isKh ? "ឈ្មោះប្រភេទ" : "Category Name",
          sortable: true,
          render: (item: StockCategory) => (
-            <span className=" text-gray-800 dark:text-white text-[14px]">
-               {item.name}
-            </span>
+            <span className=" text-gray-800 dark:text-white text-[14px]">{item.name}</span>
          ),
       },
       {
          key: "created_at", header: isKh ? "កាលបរិច្ឆេទ" : "Created Date", sortable: true,
-         render: (item: StockCategory) => {
-            const p = formatDateParts(item.created_at)
-            if (!p) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{p.date}</span>
-                  <span className="text-[12px] text-gray-600 dark:text-white/30">{p.time}</span>
-               </div>
-            )
-         },
+         render: (item: StockCategory) => dateCell(item.created_at),
       },
       {
          key: "updated_at", header: isKh ? "កែប្រែចុងក្រោយ" : "Last Updated", sortable: true,
-         render: (item: StockCategory) => {
-            const p = formatDateParts(item.updated_at)
-            if (!p) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{p.date}</span>
-                  <span className="text-[12px] text-gray-600 dark:text-white/30">{p.time}</span>
-               </div>
-            )
-         },
+         render: (item: StockCategory) => dateCell(item.updated_at),
       },
       {
          key: "item_count",
@@ -377,6 +369,8 @@ export default function StockCategoriesPage() {
       </div>
    )
 
+   const pending = update.isPending || create.isPending
+
    return (
       <div className="flex h-screen bg-gray-50 dark:bg-[#13151f] overflow-hidden transition-colors duration-300" style={SORA}>
          <Sidebar />
@@ -433,7 +427,7 @@ export default function StockCategoriesPage() {
                            className={cn(INPUT, "w-56 pl-8")}
                            placeholder={isKh ? "ស្វែងរកប្រភេទ..." : "Search category..."}
                            value={search}
-                           onChange={(e) => setSearch(e.target.value)}
+                           onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
                         />
                      </div>
                      <div className="h-5 w-px bg-gray-200 dark:bg-white/[0.07] shrink-0" />
@@ -445,7 +439,7 @@ export default function StockCategoriesPage() {
                         {hasFilter && (
                            <motion.button
                               initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
-                              onClick={() => { setSearch(""); setStartDate(""); setEndDate("") }}
+                              onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); setCurrentPage(1) }}
                               className="w-9 h-9 flex items-center justify-center rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all"
                            >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -486,7 +480,7 @@ export default function StockCategoriesPage() {
                </motion.div>
             </main>
          </div>
-         <Dialog open={isDialogOpen} onOpenChange={(v) => !update.isPending && !create.isPending && setIsDialogOpen(v)}>
+         <Dialog open={isDialogOpen} onOpenChange={(v) => !pending && setIsDialogOpen(v)}>
             <DialogContent
                className="max-w-sm p-0 border border-gray-200 dark:border-white/[0.13] shadow-2xl rounded-lg bg-white dark:bg-[#1e2235] flex flex-col [&>button]:hidden"
                style={SORA} >
@@ -581,16 +575,16 @@ export default function StockCategoriesPage() {
                   <div className="flex justify-end gap-2 w-full">
                      <button
                         onClick={() => setIsDialogOpen(false)}
-                        disabled={update.isPending || create.isPending}
+                        disabled={pending}
                         className="h-9 px-5 rounded-lg text-[14px] transition-all border border-gray-200 dark:border-white/[0.10] text-gray-600 dark:text-white/50 hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50" >
                         {isViewMode ? (isKh ? "បិទ" : "Close") : (isKh ? "បោះបង់" : "Cancel")}
                      </button>
                      {!isViewMode && (
                         <button
                            onClick={handleSave}
-                           disabled={update.isPending || create.isPending}
+                           disabled={pending}
                            className="h-9 px-6 rounded-lg text-[14px] text-white flex items-center gap-2 transition-all disabled:opacity-60 active:scale-[0.97] bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90" >
-                           {(update.isPending || create.isPending)
+                           {pending
                               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{isKh ? "កំពុងរក្សា..." : "Saving..."}</>
                               : isKh ? "រក្សាទុក" : "Save"
                            }
@@ -604,7 +598,6 @@ export default function StockCategoriesPage() {
             <AlertDialogContent
                className="rounded-2xl border-0 bg-white dark:bg-[#22263a] shadow-2xl p-0 max-w-[400px] overflow-hidden"
                style={SORA} >
-               <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-400" />
                <div className="p-6">
                   <div className="flex items-start gap-4 mb-4">
                      <div className="w-11 h-11 rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 flex items-center justify-center shrink-0">

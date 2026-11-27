@@ -1,147 +1,132 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "framer-motion"
-import type { Variants } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import { LayoutGrid } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-const CHART_COLORS = ["#1857D8", "#03624C", "#f59e0b", "#3b82f6", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899"]
-const BOX_MIN_H = "min-h-[380px]"
-
-const LEGEND_MAX_H = "max-h-[110px]"
+// dark green, blue, sage, lavender, amber, violet, red, cyan
+const CHART_COLORS = ["#265f4b", "#2b4fd1", "#7a9f8a", "#7b8de0", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"]
 
 interface CategoryDataPoint {
-  name:     string
-  value:    number
+  name: string
+  value: number // percent
   revenue?: number
-  count?:   number
+  count?: number
 }
 
-interface SalesByCategoryChartProps {
+interface Props {
   categoryData: CategoryDataPoint[]
+  total?: number // number in the middle; defaults to sum of counts
 }
 
-const staggerContainer = (stagger = 0.05): Variants => ({
-  hidden: {},
-  show:   { transition: { staggerChildren: stagger } },
-})
+export function SalesByCategoryChart({ categoryData, total }: Props) {
+  const { i18n } = useTranslation("common")
+  const isKh = i18n.language === "kh"
+  const [active, setActive] = useState<number | null>(null)
 
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-}
-
-function PieTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null
-  const d = payload[0]
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.15 }}
-      style={{
-        fontFamily:    "'Sora', sans-serif",
-        background:    "#fff",
-        border:        "1px solid #e5e7eb",
-        borderRadius:  12,
-        padding:       "10px 14px",
-        boxShadow:     "0 8px 24px rgba(0,0,0,0.12)",
-        minWidth:      140,
-        pointerEvents: "none",
-      }} >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <div style={{ width: 10, height: 10, borderRadius: "50%", background: d.payload?.color || d.fill, flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>{d.name}</span>
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 900, color: "#4f46e5", lineHeight: 1 }}>
-        {d.payload?.revenue != null ? `$${Number(d.payload.revenue).toFixed(2)}` : `${d.value}%`}
-      </div>
-      {d.payload?.count != null && (
-        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3, fontWeight: 600 }}>
-          {d.payload.count} orders
-        </div>
-      )}
-    </motion.div>
-  )
-}
-
-export function SalesByCategoryChart({ categoryData }: SalesByCategoryChartProps) {
-   const { i18n } = useTranslation("common")
-   const isKh = i18n.language === "kh"
-
-  const colored = categoryData.map((c, i) => ({
-    ...c,
-    color: CHART_COLORS[i % CHART_COLORS.length],
-  }))
+  const colored = categoryData.map((c, i) => ({ ...c, color: CHART_COLORS[i % CHART_COLORS.length] }))
+  const center = total ?? categoryData.reduce((s, c) => s + (c.count ?? 0), 0)
+  const a = active !== null ? colored[active] : null
 
   return (
-    <Card className={`bg-white dark:bg-[#1a1d2d] border border-gray-100 dark:border-white/[0.08] shadow-sm rounded-lg overflow-hidden ${BOX_MIN_H}`}>
-      <div className="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-white/[0.05]">
-        <div className="flex justify-between items-center">
-          <h3 className="text-[14px] font-bold text-gray-600 dark:text-white/40 uppercase tracking-[0.2em]">
-            {isKh ? "ការលក់តាមប្រភេទ" : "Sales by Category"}
-          </h3>
-          <LayoutGrid className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400" />
-        </div>
+    <Card className="bg-white dark:bg-[#1a1d2e] border border-gray-200 dark:border-white/[0.07] shadow-sm dark:shadow-none rounded-lg overflow-hidden h-full min-h-[380px] flex flex-col">
+      <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-white/[0.05] flex justify-between items-center">
+        <h3 className="text-[14px] font-extrabold text-gray-800 dark:text-white/60 uppercase tracking-[0.25em]">
+          {isKh ? "ការលក់តាមប្រភេទ" : "Sales by Category"}
+        </h3>
+        <LayoutGrid className="w-4 h-4 text-amber-500 fill-amber-500" />
       </div>
-      <CardContent className="px-4 pb-5">
+
+      <CardContent className="px-5 pt-6 pb-5 flex-1 flex flex-col justify-between gap-6">
         {colored.length > 0 ? (
           <>
-            <div className="h-[180px]">
+            {/* donut */}
+            <div
+              className="relative h-[220px] [&_.recharts-wrapper]:!outline-none [&_.recharts-surface]:!outline-none [&_.recharts-sector]:!outline-none [&_*]:focus:!outline-none"
+              onMouseLeave={() => setActive(null)}
+            >
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart accessibilityLayer={false} tabIndex={-1 as any}>
                   <Pie
                     data={colored}
+                    dataKey="value"
                     cx="50%" cy="50%"
-                    innerRadius={52} outerRadius={75}
-                    paddingAngle={6} dataKey="value"
+                    innerRadius={70} outerRadius={96}
+                    paddingAngle={2}
+                    cornerRadius={5}
                     stroke="none"
-                    isAnimationActive
-                    animationBegin={100}
-                    animationDuration={700}
-                    animationEasing="ease-out" >
-                    {colored.map((_: unknown, idx: number) => (
-                      <Cell key={idx} fill={colored[idx].color} />
+                    startAngle={90} endAngle={-270}
+                    rootTabIndex={-1}
+                    isAnimationActive animationDuration={700}
+                    onMouseEnter={(_: any, i: number) => setActive(i)}
+                    onMouseLeave={() => setActive(null)}
+                  >
+                    {colored.map((c, i) => (
+                      <Cell
+                        key={i}
+                        fill={c.color}
+                        fillOpacity={active === null || active === i ? 1 : 0.3}
+                        style={{ outline: "none", transition: "fill-opacity .2s" }}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip content={<PieTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
+
+              {/* centre: total, or hovered category */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-16 text-center">
+                {a ? (
+                  <>
+                    <span className="text-[14px] font-bold truncate max-w-full" style={{ color: a.color }}>{a.name}</span>
+                    <span className="font-serif text-[28px] font-black text-gray-900 dark:text-white leading-tight mt-0.5">
+                      {a.revenue != null ? `$${Number(a.revenue).toFixed(2)}` : `${a.value}%`}
+                    </span>
+                    <span className="text-[14px] text-gray-500 dark:text-white/40">
+                      {a.count != null ? `${a.count} ${isKh ? "កម្ម៉ង់" : "orders"} · ` : ""}{a.value}%
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-serif text-[44px] font-black text-gray-900 dark:text-white leading-none">{center}</span>
+                    <span className="text-[14px] text-gray-500 dark:text-white/40 mt-1">{isKh ? "សរុប" : "total"}</span>
+                  </>
+                )}
+              </div>
             </div>
-            <motion.div
-              variants={staggerContainer(0.05)}
-              initial="hidden"
-              animate="show"
-              className={`flex flex-wrap gap-1.5 mt-3 overflow-y-auto pr-0.5 ${LEGEND_MAX_H}
+
+            {/* legend chips: 2 rows visible, scroll for the rest */}
+            <div
+              className="grid grid-cols-2 auto-rows-[32px] content-start gap-1.5 max-h-[70px] overflow-y-auto pr-1
                 [&::-webkit-scrollbar]:w-1
                 [&::-webkit-scrollbar-track]:bg-transparent
                 [&::-webkit-scrollbar-thumb]:bg-gray-300
-                dark:[&::-webkit-scrollbar-thumb]:bg-white/10
-                [&::-webkit-scrollbar-thumb]:rounded-full`} >
-              {colored.map((cat) => (
-                <motion.span
-                  key={cat.name}
-                  variants={fadeUp}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-bold shrink-0"
-                  style={{
-                    backgroundColor: cat.color + "18",
-                    color:           cat.color,
-                    border:          `1px solid ${cat.color}30`,
-                  }} >
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                  {cat.name}
-                  <span className="opacity-70">{cat.value}%</span>
-                </motion.span>
+                dark:[&::-webkit-scrollbar-thumb]:bg-white/20
+                [&::-webkit-scrollbar-thumb]:rounded-full"
+            >
+              {colored.map((c, i) => (
+                <motion.div
+                  key={c.name}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: active === null || active === i ? 1 : 0.45, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  onMouseEnter={() => setActive(i)}
+                  onMouseLeave={() => setActive(null)}
+                  className="flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[14px] font-semibold leading-none cursor-default min-w-0"
+                  style={{ background: c.color + "18", color: c.color, border: `1px solid ${c.color}33` }}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
+                  <span className="flex-1 truncate">{c.name}</span>
+                  <span className="shrink-0 opacity-70 tabular-nums">{c.value}%</span>
+                </motion.div>
               ))}
-            </motion.div>
+            </div>
           </>
         ) : (
-          <div className="h-[180px] flex items-center justify-center">
-            <p className="text-[14px] text-gray-300 dark:text-white/20">
-               {isKh ? "មិនទាន់មានទិន្នន័យ" : "No data yet"}
-            </p>
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-[14px] text-gray-500 dark:text-white/30">{isKh ? "មិនទាន់មានទិន្នន័យ" : "No data yet"}</p>
           </div>
         )}
       </CardContent>

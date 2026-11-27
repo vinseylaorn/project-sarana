@@ -22,7 +22,7 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
   }
 
   const getOrderColor = (order: any) => {
-    if (order.name?.toLowerCase().includes("app"))      return "bg-indigo-100 text-indigo-600"
+    if (order.name?.toLowerCase().includes("app")) return "bg-indigo-100 text-indigo-600"
     if (order.name?.toLowerCase().includes("takeaway")) return "bg-rose-100 text-rose-600"
     return "bg-violet-100 text-violet-600"
   }
@@ -35,7 +35,7 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
         <button
           className="h-7 px-3.5 flex items-center gap-1.5 rounded-lg border text-[14px] font-semibold transition-all bg-[#03624C]/10 border-[#03624C] text-gray-600 hover:bg-[#03624C]/20 relative"
           style={SORA} >
-          <ListFilter className="w-3 h-3"/>
+          <ListFilter className="w-3 h-3" />
           {isKh ? "កម្ម៉ង់កំពុងរង់ចាំ" : "Pending"}
           {pendingOrders.length > 0 && (
             <span className="ml-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#03624C] text-white text-[12px] font-bold flex items-center justify-center">
@@ -49,7 +49,7 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
         style={SORA} >
         <DialogHeader className="px-6 py-4 border-b border-gray-100">
           <DialogTitle className="text-[16px] font-bold text-gray-800 flex items-center gap-2">
-            <ListFilter className="w-4 h-4 text-blue-500"/>
+            <ListFilter className="w-4 h-4 text-[#1857D8]" />
             {isKh ? "កម្ម៉ង់កំពុងរង់ចាំ" : "Pending Orders"}
             {pendingOrders.length > 0 && (
               <span className="ml-1 px-2 py-0.5 rounded-full bg-[#03624C]/30 text-[#03624C] text-[13px] font-bold">
@@ -62,7 +62,7 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
           {pendingOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-gray-500"/>
+                <ShoppingCart className="w-6 h-6 text-gray-500" />
               </div>
               <p className="text-[14px] font-medium text-gray-600">
                 {isKh ? "មិនមានការកម្ម៉ង់" : "No pending orders"}
@@ -70,10 +70,10 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
             </div>
           ) : (
             pendingOrders.map((order, idx) => {
-              const Icon  = getOrderIcon(order)
+              const Icon = getOrderIcon(order)
               const color = getOrderColor(order)
               const itemCount = order.order?.items?.length || 0
-              const total     = order.order?.total || 0
+              const total = order.order?.total || 0
 
               let displayName = order.name || "Order"
               const isGeneric = /^Order/.test(displayName) || /^Draft/.test(displayName) || displayName === "Order"
@@ -83,12 +83,12 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
                 <div
                   key={`${order.id}-${idx}`}
                   onClick={() => onSelectOrder(order)}
-                  className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 hover:border-indigo-200 cursor-pointer transition-all group" >
+                  className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 bg-white hover:bg-[#1857D8]/[0.04] hover:border-[#1857D8]/30 cursor-pointer transition-all group" >
                   <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", color)}>
-                    <Icon className="w-4.5 h-4.5 text-gray-600"/>
+                    <Icon className="w-4.5 h-4.5 text-gray-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[16px] font-bold text-gray-800 truncate group-hover:text-indigo-600 transition-colors">
+                    <p className="text-[16px] font-bold text-gray-800 truncate group-hover:text-[#1857D8] transition-colors">
                       {displayName}
                     </p>
                     <p className="text-[14px] text-gray-400 mt-0.5">
@@ -102,7 +102,7 @@ export function PendingDialog({ orders, onSelectOrder, language = "english" }: P
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[14px] font-bold text-emerald-600">
+                    <p className="text-[14px] font-bold text-[#03624C]">
                       ${total.toFixed(2)}
                     </p>
                     <p className="text-[12px] text-gray-300 uppercase tracking-wide mt-0.5">

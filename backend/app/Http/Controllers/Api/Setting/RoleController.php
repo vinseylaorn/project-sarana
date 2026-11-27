@@ -14,6 +14,9 @@ use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
 {
+    private const PERMS          = ['view', 'create', 'edit', 'delete'];
+    private const VIEW_ONLY_PAGES = ['dashboard', 'reports'];
+
     public function index(): JsonResponse
     {
         try {
@@ -22,19 +25,13 @@ class RoleController extends Controller
                 'name'        => $role->name,
                 'description' => $role->description,
                 'users_count' => $role->users_count,
-                'created_at'  => $role->created_at,   
-                'updated_at'  => $role->updated_at,  
+                'created_at'  => $role->created_at,
+                'updated_at'  => $role->updated_at,
             ]);
             return response()->json($roles);
         } catch (\Throwable $e) {
-            return response()->json([
-                'id'          => $role->id,
-                'name'        => $role->name,
-                'description' => $role->description,
-                'pages'       => $role->pagesArray(),
-                'created_at'  => $role->created_at,  
-                'updated_at'  => $role->updated_at,   
-            ]);
+            // FIX: កូដចាស់ប្រើ $role ដែលមិនមាននៅទីនេះ
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
@@ -61,10 +58,14 @@ class RoleController extends Controller
         }
     }
 
-    public function store(Request $request): JsonResponse
+    private function rules(?Role $role = null): array
     {
-        $data = $request->validate([
-            'name'                       => 'required|string|max:80|unique:roles,name',
+        $nameRule = $role
+            ? ['required', 'string', 'max:80', Rule::unique('roles', 'name')->ignore($role->id)]
+            : 'required|string|max:80|unique:roles,name';
+
+        return [
+            'name'                       => $nameRule,
             'description'                => 'nullable|string|max:255',
             'pages'                      => 'required|array',
             'pages.*.page'               => 'required|string',
@@ -79,7 +80,12 @@ class RoleController extends Controller
             'pages.*.permissions.create' => 'nullable|boolean',
             'pages.*.permissions.edit'   => 'nullable|boolean',
             'pages.*.permissions.delete' => 'nullable|boolean',
-        ]);
+        ];
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate($this->rules());
 
         DB::beginTransaction();
         try {
@@ -105,29 +111,13 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role): JsonResponse
     {
-        $data = $request->validate([
-            'name'                       => ['required', 'string', 'max:80', Rule::unique('roles', 'name')->ignore($role->id)],
-            'description'                => 'nullable|string|max:255',
-            'pages'                      => 'required|array',
-            'pages.*.page'               => 'required|string',
-            'pages.*.pageKey'            => 'required|string',
-            'pages.*.label'              => 'nullable|string',
-            'pages.*.labelKh'            => 'nullable|string',
-            'pages.*.section'            => 'nullable|string',
-            'pages.*.sectionKh'          => 'nullable|string',
-            'pages.*.href'               => 'nullable|string',
-            'pages.*.isDashboard'        => 'nullable|boolean',
-            'pages.*.permissions.view'   => 'nullable|boolean',
-            'pages.*.permissions.create' => 'nullable|boolean',
-            'pages.*.permissions.edit'   => 'nullable|boolean',
-            'pages.*.permissions.delete' => 'nullable|boolean',
-        ]);
+        $data = $request->validate($this->rules($role));
 
         DB::beginTransaction();
         try {
             $role->update([
                 'name'        => $data['name'],
-                'description' => $data['description'] ?? $role->description,
+                'description' => $data['description'] ?? null,
             ]);
             $role->permissions()->delete();
             $this->syncPermissions($role, $data['pages']);
@@ -147,22 +137,25 @@ class RoleController extends Controller
     }
 
     public function destroy(Role $role): JsonResponse
-{
-    try {
-        $userCount = User::where('role_id', $role->id)->count();
-        if ($userCount > 0) {
-            return response()->json([
-                'message' => "Cannot delete role \"{$role->name}\" because {$userCount} user(s) are assigned to it."
-            ], 422);
-        }
+    {
+        try {
+            $userCount = User::where('role_id', $role->id)->count();
+            if ($userCount > 0) {
+                return response()->json([
+                    'message' => "Cannot delete role \"{$role->name}\" because {$userCount} user(s) are assigned to it.",
+                ], 422);
+            }
 
-        $role->permissions()->delete();
-        $role->delete();
-        return response()->json(['message' => 'Role deleted']);
-    } catch (\Throwable $e) {
-        return response()->json(['message' => $e->getMessage()], 500);
+            DB::transaction(function () use ($role) {
+                $role->permissions()->delete();
+                $role->delete();
+            });
+
+            return response()->json(['message' => 'Role deleted']);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
-}
 
     public function users(Role $role): JsonResponse
     {
@@ -180,13 +173,16 @@ class RoleController extends Controller
         return response()->json($users);
     }
 
+    /**
+     * រក្សាទុក permission ដោយ **ឯករាជ្យ** ពីគ្នា។
+     * មិនបង្ខំ view ពេល edit/create/delete ទៀតទេ។
+     */
     private function syncPermissions(Role $role, array $pages): void
     {
-        $hasLabelCols  = Schema::hasColumn('role_permissions', 'label');
-        $viewOnlyPages = ['dashboard', 'reports'];
-        $rows          = [];
+        $hasLabelCols = Schema::hasColumn('role_permissions', 'label');
+        $rows         = [];
+        $grouped      = [];
 
-        $grouped = [];
         foreach ($pages as $pg) {
             $pageKey = $pg['pageKey'];
 
@@ -198,39 +194,43 @@ class RoleController extends Controller
                     'labelKh'     => $pg['labelKh']     ?? $pageKey,
                     'section'     => $pg['section']     ?? null,
                     'sectionKh'   => $pg['sectionKh']   ?? null,
-                    'href'        => $pg['href']         ?? null,
-                    'isDashboard' => $pg['isDashboard']  ?? false,
-                    'permissions' => ['view' => false, 'create' => false, 'edit' => false, 'delete' => false],
+                    'href'        => $pg['href']        ?? null,
+                    'isDashboard' => $pg['isDashboard'] ?? false,
+                    'permissions' => array_fill_keys(self::PERMS, false),
                 ];
             }
 
-            foreach (['view', 'create', 'edit', 'delete'] as $perm) {
-                if ($pg['permissions'][$perm] ?? false) {
+            foreach (self::PERMS as $perm) {
+                if (!empty($pg['permissions'][$perm])) {
                     $grouped[$pageKey]['permissions'][$perm] = true;
                 }
             }
         }
 
+        $now = now();
         foreach ($grouped as $entry) {
-            foreach (['view', 'create', 'edit', 'delete'] as $perm) {
-                if (in_array($entry['pageKey'], $viewOnlyPages) && $perm !== 'view') continue;
+            foreach (self::PERMS as $perm) {
+                $isViewOnly = in_array($entry['pageKey'], self::VIEW_ONLY_PAGES, true);
 
                 $row = [
                     'role_id'    => $role->id,
                     'page'       => $entry['page'],
                     'page_key'   => $entry['pageKey'],
                     'permission' => $perm,
-                    'granted'    => (bool) $entry['permissions'][$perm],
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    // dashboard/reports មានតែ view
+                    'granted'    => ($isViewOnly && $perm !== 'view')
+                        ? false
+                        : (bool) $entry['permissions'][$perm],
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
 
                 if ($hasLabelCols) {
-                    $row['label']      = $entry['label']     ?? null;
-                    $row['label_kh']   = $entry['labelKh']   ?? null;
-                    $row['section']    = $entry['section']   ?? null;
-                    $row['section_kh'] = $entry['sectionKh'] ?? null;
-                    $row['href']       = $entry['href']      ?? null;
+                    $row['label']      = $entry['label'];
+                    $row['label_kh']   = $entry['labelKh'];
+                    $row['section']    = $entry['section'];
+                    $row['section_kh'] = $entry['sectionKh'];
+                    $row['href']       = $entry['href'];
                 }
 
                 $rows[] = $row;

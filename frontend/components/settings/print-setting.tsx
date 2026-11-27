@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import {
   Printer, Plus, Trash2, Loader2, CheckCircle,
-  RefreshCw, Wifi, WifiOff, AlertCircle, AlertTriangle, Edit2,
+  RefreshCw, Wifi, WifiOff, AlertCircle, AlertTriangle, Edit2, Info,
 } from "lucide-react"
 import {
   Dialog, DialogContent, DialogHeader,
@@ -16,7 +16,7 @@ import {
   AlertDialogFooter, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { menuCategoriesApi } from "@/lib/api"
-import { printerApi }        from "@/lib/api/printer"
+import { printerApi } from "@/lib/api/printer"
 import type { MenuCategory } from "@/types"
 
 export interface PrinterCategory {
@@ -35,22 +35,22 @@ export interface PrinterDevice {
 }
 
 const ACCENT = {
-  bg:     "bg-[#03624C] dark:bg-[#1857D8]",
+  bg: "bg-[#03624C] dark:bg-[#1857D8]",
   iconBg: "bg-[#03624C] dark:bg-[#1857D8]",
-  text:   "text-[#03624C] dark:text-[#6b9fff]",
+  text: "text-[#03624C] dark:text-[#6b9fff]",
   border: "border-[#03624C]/20 dark:border-[#1857D8]/30",
   subtle: "bg-[#03624C]/5 dark:bg-[#1857D8]/10",
   subtleHover: "hover:bg-[#03624C]/10 dark:hover:bg-[#1857D8]/20",
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  drink:    "#378ADD",
+  drink: "#378ADD",
   cocktail: "#7F77DD",
-  wine:     "#D4537E",
-  food:     "#639922",
-  hotfood:  "#BA7517",
-  dessert:  "#D85A30",
-  snack:    "#1D9E75",
+  wine: "#D4537E",
+  food: "#639922",
+  hotfood: "#BA7517",
+  dessert: "#D85A30",
+  snack: "#1D9E75",
   takeaway: "#888780",
 }
 
@@ -70,10 +70,10 @@ const INPUT =
 function apiCatToPrinterCat(cat: MenuCategory, idx: number): PrinterCategory {
   const slug = cat.name.toLowerCase().replace(/\s+/g, "")
   return {
-    id:     String(cat.id),
-    name:   cat.name,
+    id: String(cat.id),
+    name: cat.name,
     nameKh: cat.name,
-    color:  CATEGORY_COLORS[slug] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+    color: CATEGORY_COLORS[slug] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
   }
 }
 
@@ -94,13 +94,14 @@ function CategoryRow({
         : "border-gray-100 dark:border-white/[0.06] bg-white dark:bg-white/[0.02]",
       disabled && !checked && "opacity-40 cursor-not-allowed",
     )}>
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5 min-w-0">
         <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: category.color }} />
-        <span className="text-[14px] font-medium text-gray-700 dark:text-white/70">
+        <span className="text-[14px] font-medium text-gray-700 dark:text-white/70 truncate">
           {isKh ? category.nameKh : category.name}
         </span>
       </div>
       <button
+        type="button"
         onClick={onToggle}
         disabled={disabled && !checked}
         aria-label={`Toggle ${category.name}`}
@@ -147,7 +148,7 @@ function PrinterCard({
 
   return (
     <div className={cn(
-      "rounded-xl border overflow-hidden transition-all",
+      "rounded-xl border overflow-hidden transition-all bg-white dark:bg-transparent",
       selectedCount > 0
         ? "border-[#03624C]/40 dark:border-[#1857D8]/30"
         : "border-gray-100 dark:border-white/[0.06]",
@@ -171,46 +172,48 @@ function PrinterCard({
             <p className="text-[14px] font-bold text-gray-800 dark:text-white/90 truncate leading-tight">
               {printer.name}
             </p>
-            <p className="text-[10px] text-gray-400 dark:text-white/30 font-mono leading-tight">
+            <p className="text-[11px] text-gray-400 dark:text-white/30 font-mono leading-tight">
               {printer.ipAddress}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => onPing(printer.id)}>
+          <button type="button" onClick={() => onPing(printer.id)} title={isKh ? "ពិនិត្យការតភ្ជាប់" : "Check connection"}>
             {printer.status === "online" ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E1F5EE] text-[#0F6E56] border border-[#9FE1CB] cursor-pointer hover:opacity-80 transition dark:bg-[#1857D8]/20 dark:text-[#6b9fff] dark:border-[#1857D8]/30">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E1F5EE] text-[#0F6E56] border border-[#9FE1CB] cursor-pointer hover:opacity-80 transition dark:bg-[#1857D8]/20 dark:text-[#6b9fff] dark:border-[#1857D8]/30">
                 <Wifi className="w-2.5 h-2.5" />
                 {isKh ? "តភ្ជាប់" : "Online"}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FCEBEB] text-[#A32D2D] border border-[#F7C1C1] cursor-pointer hover:opacity-80 transition dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FCEBEB] text-[#A32D2D] border border-[#F7C1C1] cursor-pointer hover:opacity-80 transition dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20">
                 <WifiOff className="w-2.5 h-2.5" />
                 {isKh ? "ផ្ដាច់" : "Offline"}
               </span>
             )}
           </button>
           <button
+            type="button"
             onClick={() => onEditClick(printer)}
             aria-label="Edit printer"
-            className="w-6 h-6 rounded-md flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all" >
-            <Edit2 className="w-3 h-3" />
+            className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 dark:text-white/30 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all" >
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => onDeleteClick(printer)}
             aria-label="Delete printer"
-            className="w-6 h-6 rounded-md flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all" >
-            <Trash2 className="w-4 h-4" />
+            className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 dark:text-white/30 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all" >
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
       <div className="p-3 space-y-1.5">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-gray-400 dark:text-white/30">
+          <span className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-400 dark:text-white/30">
             {isKh ? "ប្រភេទ" : "Categories"}
           </span>
           <span className={cn(
-            "text-[10px] font-bold",
+            "text-[11px] font-bold",
             selectedCount > 0 ? "text-[#03624C] dark:text-[#6b9fff]" : "text-gray-300 dark:text-white/20",
           )}>
             {selectedCount} {isKh ? "ជ្រើស" : "selected"}
@@ -247,14 +250,14 @@ function PrinterDialog({
   onClose: () => void
 }) {
   const isEdit = !!printer?.id && !printer.id.startsWith("printer_new")
-  const [name,    setName]    = useState("")
-  const [ip,      setIp]      = useState("")
-  const [error,   setError]   = useState("")
+  const [name, setName] = useState("")
+  const [ip, setIp] = useState("")
+  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setName(printer?.name    ?? "")
+      setName(printer?.name ?? "")
       setIp(printer?.ipAddress ?? "")
       setError("")
     }
@@ -267,7 +270,7 @@ function PrinterDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) { setError(isKh ? "សូមដាក់ឈ្មោះ printer" : "Printer name is required"); return }
-    if (!ip.trim())   { setError(isKh ? "សូមដាក់ IP address"    : "IP address is required");   return }
+    if (!ip.trim()) { setError(isKh ? "សូមដាក់ IP address" : "IP address is required"); return }
     setLoading(true)
     try {
       if (isEdit && printer) {
@@ -302,7 +305,7 @@ function PrinterDialog({
               <DialogDescription className="text-[14px] text-gray-400 dark:text-white/30 leading-tight mt-0">
                 {isEdit
                   ? (isKh ? "កែប្រែព័ត៌មាន printer" : "Update printer information")
-                  : (isKh ? "ភ្ជាប់ printer ថ្មី"    : "Connect a new printer")}
+                  : (isKh ? "ភ្ជាប់ printer ថ្មី" : "Connect a new printer")}
               </DialogDescription>
             </div>
           </div>
@@ -320,7 +323,7 @@ function PrinterDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[14px] font-black  text-gray-600 dark:text-white/30">
+            <label className="text-[14px] font-black text-gray-600 dark:text-white/30">
               IP Address
             </label>
             <input
@@ -348,7 +351,7 @@ function PrinterDialog({
             onClick={handleSubmit}
             disabled={loading}
             className={cn(
-              "h-9 px-5 rounded-lg text-[14px] font-bold text-white flex items-center gap-1.5 transition-all active:scale-[0.97] disabled:opacity-60",
+              "h-9 px-5 rounded-lg text-[14px] font-bold text-white flex items-center gap-1.5 whitespace-nowrap transition-all active:scale-[0.97] disabled:opacity-60",
               ACCENT.bg,
             )} >
             {loading ? (
@@ -375,7 +378,7 @@ function ScanResultDialog({
   onClose: () => void
 }) {
   const [selected, setSelected] = useState<string[]>([])
-  const [saving,   setSaving]   = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) setSelected(devices.map(d => d.ip_address))
@@ -447,14 +450,14 @@ function ScanResultDialog({
         <DialogFooter className="px-5 py-4 bg-gray-50 dark:bg-[#1e2235] border-t border-gray-100 dark:border-white/[0.07] sm:justify-end gap-2">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[14px]  font-semibold text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition" >
+            className="h-9 px-4 rounded-lg text-[14px] font-semibold text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition" >
             {isKh ? "បោះបង់" : "Cancel"}
           </button>
           <button
             onClick={handleSave}
             disabled={selected.length === 0 || saving}
             className={cn(
-              "h-9 px-5 rounded-lg text-[14px] font-bold text-white flex items-center gap-1.5 transition-all active:scale-[0.97] disabled:opacity-60",
+              "h-9 px-5 rounded-lg text-[14px] font-bold text-white flex items-center gap-1.5 whitespace-nowrap transition-all active:scale-[0.97] disabled:opacity-60",
               ACCENT.bg,
             )} >
             {saving
@@ -474,21 +477,21 @@ export interface PrinterSectionProps {
 }
 
 export function PrinterSection({ isKh, delay = 0 }: PrinterSectionProps) {
-  const [printers,     setPrinters]     = useState<PrinterDevice[]>([])
-  const [categories,   setCategories]   = useState<PrinterCategory[]>([])
-  const [catLoading,   setCatLoading]   = useState(true)
-  const [prtLoading,   setPrtLoading]   = useState(true)
-  const [isScanning,   setIsScanning]   = useState(false)
-  const [isSaving,     setIsSaving]     = useState(false)
-  const [saveSuccess,  setSaveSuccess]  = useState(false)
-  const [saveError,    setSaveError]    = useState("")
-  const [showDialog,   setShowDialog]   = useState(false)
-  const [editTarget,   setEditTarget]   = useState<PrinterDevice | null>(null)
+  const [printers, setPrinters] = useState<PrinterDevice[]>([])
+  const [categories, setCategories] = useState<PrinterCategory[]>([])
+  const [catLoading, setCatLoading] = useState(true)
+  const [prtLoading, setPrtLoading] = useState(true)
+  const [isScanning, setIsScanning] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState("")
+  const [showDialog, setShowDialog] = useState(false)
+  const [editTarget, setEditTarget] = useState<PrinterDevice | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PrinterDevice | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [deleting,     setDeleting]     = useState(false)
-  const [scanDevices,  setScanDevices]  = useState<{ ip_address: string; name: string; status: string; categories: string[] }[]>([])
-  const [showScan,     setShowScan]     = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [scanDevices, setScanDevices] = useState<{ ip_address: string; name: string; status: string; categories: string[] }[]>([])
+  const [showScan, setShowScan] = useState(false)
 
   useEffect(() => {
     printerApi.list()
@@ -502,7 +505,7 @@ export function PrinterSection({ isKh, delay = 0 }: PrinterSectionProps) {
       .finally(() => setCatLoading(false))
   }, [])
 
-  const openAdd  = () => { setEditTarget(null); setShowDialog(true) }
+  const openAdd = () => { setEditTarget(null); setShowDialog(true) }
   const openEdit = (p: PrinterDevice) => { setEditTarget(p); setShowDialog(true) }
   const openDelete = (p: PrinterDevice) => { setDeleteTarget(p); setIsDeleteOpen(true) }
 
@@ -585,83 +588,94 @@ export function PrinterSection({ isKh, delay = 0 }: PrinterSectionProps) {
   }
 
   const isLoading = prtLoading || catLoading
+  const onlineCount = printers.filter(p => p.status === "online").length
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay }}
-      className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-white/[0.06] shadow-sm dark:shadow-none overflow-hidden" >
+      className="h-full flex flex-col bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-white/[0.06] shadow-sm dark:shadow-none overflow-hidden" >
+
+      {/* Header */}
       <div className="px-6 py-4 border-b border-gray-100 dark:border-white/[0.07] bg-gray-50 dark:bg-[#22263a] rounded-t-2xl">
         <div className="flex items-center gap-2.5">
-          <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", ACCENT.iconBg)}>
+          <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center shrink-0", ACCENT.iconBg)}>
             <Printer className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <p className="text-[16px] font-bold text-gray-800 dark:text-white/90 leading-tight">
+          <div className="min-w-0">
+            <p className="text-[14px] font-bold text-gray-800 dark:text-white/90 leading-tight">
               {isKh ? "ការកំណត់ Printer" : "Printer configuration"}
             </p>
-            <p className="text-[12px] text-gray-400 dark:text-white/30 leading-tight mt-0.5">
+            <p className="text-[12px] text-gray-600 dark:text-white/30 leading-tight mt-0.5">
               {isKh ? "ភ្ជាប់ Printer និង Assign Category" : "Connect printers and assign food categories"}
             </p>
           </div>
         </div>
       </div>
-      <div className="p-6 space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 text-[14px] text-gray-600 dark:text-white/30">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-            {isKh
-              ? "Category មួយ assign បាន printer តែមួយ"
-              : "Each category can only be assigned to one printer"}
+
+      {/* Body */}
+      <div className="p-6 space-y-5 flex-1 flex flex-col">
+
+        {/* Toolbar: wraps nicely on narrow cards, buttons never break into 2 lines */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] text-[13px] text-gray-600 dark:text-white/40 min-w-0 flex-1 basis-[220px]">
+            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="leading-snug">
+              {isKh
+                ? "Category មួយ assign បាន printer តែមួយ"
+                : "Each category can only be assigned to one printer"}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
             <button
+              type="button"
               onClick={handleScan}
               disabled={isScanning}
               className={cn(
-                "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[14px] font-bold transition-all border disabled:opacity-50",
-                ACCENT.text,
-                ACCENT.subtle,
-                ACCENT.subtleHover,
-                ACCENT.border,
+                "inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg text-[14px] font-bold whitespace-nowrap transition-all border disabled:opacity-50",
+                ACCENT.text, ACCENT.subtle, ACCENT.subtleHover, ACCENT.border,
               )} >
-              <RefreshCw className={cn("w-3 h-3", isScanning && "animate-spin")} />
+              <RefreshCw className={cn("w-3.5 h-3.5 shrink-0", isScanning && "animate-spin")} />
               {isScanning
                 ? (isKh ? "កំពុង Scan..." : "Scanning...")
                 : (isKh ? "Scan Printer" : "Scan printers")}
             </button>
             <button
+              type="button"
               onClick={openAdd}
               className={cn(
-                "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[14px] font-bold text-white transition-all active:scale-[0.97]",
+                "inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg text-[14px] font-bold text-white whitespace-nowrap transition-all active:scale-[0.97] hover:opacity-90",
                 ACCENT.bg,
               )} >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5 shrink-0" />
               {isKh ? "បន្ថែម" : "Add printer"}
             </button>
           </div>
         </div>
-        {isLoading && (
-          <div className="flex items-center gap-2 text-[14px] text-gray-400 dark:text-white/30">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="flex-1 min-h-[160px] flex flex-col items-center justify-center gap-2 text-[14px] text-gray-400 dark:text-white/30">
+            <Loader2 className={cn("w-5 h-5 animate-spin", ACCENT.text)} />
             {isKh ? "កំពុងទាញទិន្នន័យ..." : "Loading..."}
           </div>
-        )}
-        {!isLoading && printers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/[0.05] flex items-center justify-center">
-              <Printer className="w-6 h-6 text-gray-300 dark:text-white/20" />
+        ) : printers.length === 0 ? (
+          <div className="flex-1 min-h-[220px] flex flex-col items-center justify-center gap-3 text-center rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/[0.08] bg-gray-50/50 dark:bg-white/[0.02] px-6 py-8">
+            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center border", ACCENT.subtle, ACCENT.border)}>
+              <Printer className={cn("w-7 h-7", ACCENT.text)} />
             </div>
-            <p className="text-[16px] font-bold text-gray-400 dark:text-white/30">
-              {isKh ? "មិនទាន់មាន Printer" : "No printers yet"}
-            </p>
-            <p className="text-[14px] text-gray-300 dark:text-white/20">
-              {isKh ? "Scan ឬ Add Printer ថ្មី" : "Scan the network or add one manually"}
-            </p>
+            <div className="space-y-1">
+              <p className="text-[16px] font-bold text-gray-700 dark:text-white/70">
+                {isKh ? "មិនទាន់មាន Printer" : "No printers yet"}
+              </p>
+              <p className="text-[14px] text-gray-500 dark:text-white/30">
+                {isKh ? "Scan ឬ Add Printer ថ្មី" : "Scan the network or add one manually"}
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))] items-start">
             {printers.map(p => (
               <PrinterCard
                 key={p.id}
@@ -678,32 +692,40 @@ export function PrinterSection({ isKh, delay = 0 }: PrinterSectionProps) {
           </div>
         )}
       </div>
-      <div className="px-6 py-4 bg-gray-50 dark:bg-[#1e2235] border-t border-gray-100 dark:border-white/[0.07] flex items-center justify-between rounded-b-2xl">
-        <div>
-          {saveError && (
-            <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">
-              {saveError}
+
+      {/* Footer */}
+      <div className="px-6 py-4 bg-gray-50 dark:bg-[#1e2235] border-t border-gray-100 dark:border-white/[0.07] flex items-center justify-between gap-3 rounded-b-2xl">
+        <div className="min-w-0">
+          {saveError ? (
+            <p className="text-[14px] text-rose-500 dark:text-rose-400 font-medium truncate">{saveError}</p>
+          ) : !isLoading && printers.length > 0 ? (
+            <p className="text-[13px] text-gray-500 dark:text-white/30 truncate">
+              {isKh
+                ? `${printers.length} Printer · ${onlineCount} តភ្ជាប់`
+                : `${printers.length} printer${printers.length > 1 ? "s" : ""} · ${onlineCount} online`}
             </p>
-          )}
+          ) : null}
         </div>
         <button
+          type="button"
           onClick={handleSave}
           disabled={isSaving || saveSuccess || isLoading}
           className={cn(
-            "h-9 px-6 rounded-lg text-[14px] font-bold flex items-center gap-2 transition-all disabled:opacity-60 active:scale-[0.97] text-white",
+            "h-9 px-6 rounded-lg text-[14px] font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all disabled:opacity-60 active:scale-[0.97] text-white",
             saveSuccess
               ? "bg-emerald-500 shadow-sm shadow-emerald-500/20"
               : "bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90",
           )} >
-          {isSaving    && <Loader2     className="w-3.5 h-3.5 animate-spin" />}
+          {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {saveSuccess && <CheckCircle className="w-3.5 h-3.5" />}
           {saveSuccess
             ? (isKh ? "រក្សាទុករួច!" : "Saved!")
             : isSaving
-            ? (isKh ? "កំពុងរក្សា..." : "Saving...")
-            : (isKh ? "រក្សាទុក" : "Save config")}
+              ? (isKh ? "កំពុងរក្សា..." : "Saving...")
+              : (isKh ? "រក្សាទុក" : "Save config")}
         </button>
       </div>
+
       <PrinterDialog
         open={showDialog}
         isKh={isKh}

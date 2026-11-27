@@ -48,7 +48,19 @@ const todayStr = () => {
 export default function SpoilagePage() {
    const { i18n } = useTranslation("common")
    const isKh = i18n.language === "kh"
-   const { can } = usePermission("inventory")
+   // key ផ្ទាល់ខ្លួន (ធ្លាក់ទៅ key មេស្វ័យប្រវត្តិបើ nav មិនមាន key នេះ)
+   const { can } = usePermission("spoilage")
+
+   const canView = can("view")
+   const canCreate = can("create")
+   const canEdit = can("edit")
+   const canDelete = can("delete")
+
+   const deny = () =>
+      toastWarn(
+         isKh ? "គ្មានសិទ្ធិ" : "Permission denied",
+         isKh ? "អ្នកមិនមានសិទ្ធិធ្វើសកម្មភាពនេះទេ" : "You don't have permission to do this"
+      )
 
    const { data: inventory = [], isLoading: loadingInventory, isFetching: fetchingInventory } = useInventory()
    const {
@@ -99,6 +111,7 @@ export default function SpoilagePage() {
    }, [spoilageList])
 
    const handleOpenAdd = () => {
+      if (!canCreate) return deny()
       setIsViewMode(false)
       setCurrentItem({
          inventoryId: "",
@@ -115,6 +128,7 @@ export default function SpoilagePage() {
    }
 
    const handleOpenEdit = (item: Spoilage) => {
+      if (!canEdit) return deny()
       setCurrentItem({
          id: item.id,
          inventoryId: item.inventory_id,
@@ -131,6 +145,7 @@ export default function SpoilagePage() {
    }
 
    const handleOpenView = (item: Spoilage) => {
+      if (!canView) return deny()
       setCurrentItem({
          id: item.id,
          inventoryId: item.inventory_id,
@@ -144,7 +159,16 @@ export default function SpoilagePage() {
       setIsDialogOpen(true)
    }
 
+   const handleOpenDelete = (item: Spoilage) => {
+      if (!canDelete) return deny()
+      setItemToDelete(item)
+      setIsDeleteAlertOpen(true)
+   }
+
    const handleSave = async () => {
+      // ពិនិត្យសិទ្ធិតាមប្រភេទសកម្មភាព
+      if (currentItem?.id ? !canEdit : !canCreate) return deny()
+
       const errs: typeof fieldErrors = {}
       if (!currentItem?.inventoryId) errs.inventoryId = isKh ? "សូមជ្រើសរើសទំនិញ" : "Please select a product"
       if (!currentItem?.qty || currentItem.qty <= 0) errs.qty = isKh ? "សូមបញ្ចូលចំនួនត្រឹមត្រូវ" : "Please enter a valid quantity"
@@ -199,6 +223,7 @@ export default function SpoilagePage() {
    }
 
    const confirmDelete = async () => {
+      if (!canDelete) return deny()
       if (!itemToDelete) return
       try {
          await remove.mutateAsync(itemToDelete.id)
@@ -254,7 +279,10 @@ export default function SpoilagePage() {
 
    const hasFilter = search || startDate || endDate || categoryFilter !== "all"
 
-   const columns = [
+   // បង្ហាញជួរ Actions តែពេលមានសិទ្ធិយ៉ាងហោចណាស់មួយ
+   const showActions = canView || canEdit || canDelete
+
+   const baseColumns = [
       {
          key: "no", header: isKh ? "ល.រ" : "No.",
          render: (_: any, i: number) => (
@@ -325,12 +353,15 @@ export default function SpoilagePage() {
             </span>
          ),
       },
-      {
-         key: "actions",
-         header: "",
-         className: "text-right",
-         render: (item: Spoilage) => (
-            <div className="flex items-center justify-end gap-1.5">
+   ]
+
+   const actionsColumn = {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (item: Spoilage) => (
+         <div className="flex items-center justify-end gap-1.5">
+            {canView && (
                <button
                   onClick={() => handleOpenView(item)}
                   className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
@@ -343,40 +374,42 @@ export default function SpoilagePage() {
                >
                   <Eye className="w-3.5 h-3.5" />
                </button>
+            )}
 
-               {can("edit") && (
-                  <button
-                     onClick={() => handleOpenEdit(item)}
-                     className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
-                     text-amber-700 bg-amber-50 border border-amber-200
-                     hover:bg-amber-100 hover:border-amber-300
-                     dark:text-amber-300 dark:bg-amber-900/20 dark:border-amber-700/40
-                     dark:hover:bg-amber-900/40 dark:hover:border-amber-500
-                     transition-all duration-150"
-                     title={isKh ? "កែប្រែ" : "Edit"}
-                  >
-                     <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-               )}
+            {canEdit && (
+               <button
+                  onClick={() => handleOpenEdit(item)}
+                  className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
+                  text-amber-700 bg-amber-50 border border-amber-200
+                  hover:bg-amber-100 hover:border-amber-300
+                  dark:text-amber-300 dark:bg-amber-900/20 dark:border-amber-700/40
+                  dark:hover:bg-amber-900/40 dark:hover:border-amber-500
+                  transition-all duration-150"
+                  title={isKh ? "កែប្រែ" : "Edit"}
+               >
+                  <Edit2 className="w-3.5 h-3.5" />
+               </button>
+            )}
 
-               {can("delete") && (
-                  <button
-                     onClick={() => { setItemToDelete(item); setIsDeleteAlertOpen(true) }}
-                     className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
-                     text-rose-700 bg-rose-50 border border-rose-200
-                     hover:bg-rose-100 hover:border-rose-300
-                     dark:text-rose-300 dark:bg-rose-900/20 dark:border-rose-700/40
-                     dark:hover:bg-rose-900/40 dark:hover:border-rose-500
-                     transition-all duration-150"
-                     title={isKh ? "លុបចោល" : "Delete"}
-                  >
-                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-               )}
-            </div>
-         ),
-      },
-   ]
+            {canDelete && (
+               <button
+                  onClick={() => handleOpenDelete(item)}
+                  className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
+                  text-rose-700 bg-rose-50 border border-rose-200
+                  hover:bg-rose-100 hover:border-rose-300
+                  dark:text-rose-300 dark:bg-rose-900/20 dark:border-rose-700/40
+                  dark:hover:bg-rose-900/40 dark:hover:border-rose-500
+                  transition-all duration-150"
+                  title={isKh ? "លុបចោល" : "Delete"}
+               >
+                  <Trash2 className="w-3.5 h-3.5" />
+               </button>
+            )}
+         </div>
+      ),
+   }
+
+   const columns = showActions ? [...baseColumns, actionsColumn] : baseColumns
 
    const showInitialLoading = loading && spoilageList.length === 0
 
@@ -469,7 +502,7 @@ export default function SpoilagePage() {
                            <RefreshCw className={cn("w-3.5 h-3.5", isFetching && "animate-spin")} />
                         </button>
                      </div>
-                     {can("create") && (
+                     {canCreate && (
                         <button onClick={handleOpenAdd} className="h-9 px-4 flex items-center gap-1.5 rounded-lg text-[14px] text-white transition-all active:scale-[0.97] bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90">
                            <Plus className="w-3.5 h-3.5" />
                            {isKh ? "បន្ថែមទំនិញខូច" : "Add Spoilage"}

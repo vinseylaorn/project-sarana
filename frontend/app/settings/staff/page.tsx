@@ -9,11 +9,7 @@ import {
    Dialog, DialogContent, DialogHeader, DialogTitle,
    DialogFooter, DialogDescription,
 } from "@/components/ui/dialog"
-import {
-   AlertDialog, AlertDialogAction, AlertDialogCancel,
-   AlertDialogContent, AlertDialogDescription,
-   AlertDialogFooter, AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
@@ -1077,52 +1073,19 @@ export default function StaffPage() {
                </div>
             </DialogContent>
          </Dialog>
-         <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-            <AlertDialogContent
-               className="rounded-2xl border-0 bg-white dark:bg-[#22263a] shadow-2xl p-0 max-w-[400px] overflow-hidden"
-               style={SORA} >
-               <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-400" />
-               <div className="p-6">
-                  <div className="flex items-start gap-4 mb-4">
-                     <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 flex items-center justify-center shrink-0">
-                        <AlertTriangle className="w-6 h-6 text-rose-500 dark:text-rose-400" />
-                     </div>
-                     <div className="pt-0.5">
-                        <AlertDialogTitle className="text-[16px] font-bold text-gray-800 dark:text-white/90 mb-1">
-                           {isKh ? "បញ្ជាក់ការលុប" : "Confirm Delete"}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-[14px] text-gray-500 dark:text-white/40 leading-relaxed">
-                           {isKh ? "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។" : "This action cannot be undone."}
-                        </AlertDialogDescription>
-                     </div>
-                  </div>
-                  {itemToDelete?.name && (
-                     <div className="mb-5 px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/[0.08] border border-rose-100 dark:border-rose-500/20 flex items-center gap-2">
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                        <span className="text-[14px] text-rose-600 dark:text-rose-300 truncate">{itemToDelete.name}</span>
-                     </div>
-                  )}
-                  <AlertDialogFooter className="gap-2 flex-row justify-end">
-                     <AlertDialogCancel
-                        style={SORA}
-                        onClick={() => { setIsDeleteAlertOpen(false); setItemToDelete(null) }}
-                        className="h-9 px-5 rounded-xl text-[14px] font-bold border border-gray-200 dark:border-white/[0.10] text-gray-600 dark:text-white/50 bg-transparent hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-all" >
-                        {isKh ? "បោះបង់" : "Cancel"}
-                     </AlertDialogCancel>
-                     <AlertDialogAction
-                        onClick={confirmDelete}
-                        disabled={deleting}
-                        style={SORA}
-                        className="h-9 px-5 rounded-xl text-[14px] font-bold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-600/20 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300 dark:border dark:border-rose-500/30 dark:shadow-none disabled:opacity-60 transition-all" >
-                        {deleting
-                           ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{isKh ? "កំពុងលុប..." : "Deleting..."}</>
-                           : <><Trash2 className="w-3.5 h-3.5" />{isKh ? "លុបចោល" : "Delete"}</>
-                        }
-                     </AlertDialogAction>
-                  </AlertDialogFooter>
-               </div>
-            </AlertDialogContent>
-         </AlertDialog>
+         <ConfirmDialog
+            open={isDeleteAlertOpen}
+            onOpenChange={v => { setIsDeleteAlertOpen(v); if (!v) setItemToDelete(null) }}
+            onConfirm={confirmDelete}
+            loading={deleting}
+            variant="danger"
+            icon={Trash2}
+            title={isKh ? "បញ្ជាក់ការលុប" : "Confirm Delete"}
+            description={isKh ? "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។" : "This action cannot be undone."}
+            highlight={itemToDelete?.name}
+            confirmLabel={isKh ? "លុបចោល" : "Delete"}
+            cancelLabel={isKh ? "បោះបង់" : "Cancel"}
+         />
       </div>
    )
 }

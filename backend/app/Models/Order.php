@@ -3,9 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use DateTimeInterface;
 
 class Order extends Model
@@ -19,6 +20,7 @@ class Order extends Model
         'payment_method',
         'staff_id',
         'working_shift_id',
+        'merged_into_order_id',
         'discount_amount',
         'tax_amount',
         'vip_discount_amount',
@@ -35,7 +37,6 @@ class Order extends Model
     {
         return $date->toIso8601String();
     }
-
 
     public function items(): HasMany
     {
@@ -55,5 +56,31 @@ class Order extends Model
     public function workingShift(): BelongsTo
     {
         return $this->belongsTo(WorkingShift::class);
+    }
+
+    /** All tables of a merged order (empty for a normal order). */
+    public function tables(): BelongsToMany
+    {
+        return $this->belongsToMany(RestaurantTable::class, 'order_tables', 'order_id', 'table_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * ដោះលែងតុទាំងអស់របស់ order នេះ (តុដើម + តុដែល merge ចូល) ឱ្យទៅ available
+     * ហៅក្រោយ complete() ឬ cancel()
+     */
+    public function releaseTables(): void
+    {
+        $ids = $this->tables()->pluck('restaurant_tables.id')->all();
+
+        RestaurantTable::where(function ($q) use ($ids) {
+            $q->where('name', $this->table_name);
+            if (!empty($ids)) {
+                $q->orWhereIn('id', $ids);
+            }
+        })->update([
+            'status'       => 'available',
+            'reserve_time' => null,
+        ]);
     }
 }

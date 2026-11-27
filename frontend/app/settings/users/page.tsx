@@ -88,6 +88,59 @@ const ErrMsg = ({ msg }: { msg: string }) => (
    </p>
 )
 
+// ─── Strong password ──────────────────────────────────────────────
+const PASSWORD_RULES = [
+   { id: "len", test: (p: string) => p.length >= 8, en: "At least 8 characters", kh: "យ៉ាងតិច 8 តួអក្សរ" },
+   { id: "lower", test: (p: string) => /[a-z]/.test(p), en: "One lowercase letter (a-z)", kh: "អក្សរតូច (a-z)" },
+   { id: "upper", test: (p: string) => /[A-Z]/.test(p), en: "One uppercase letter (A-Z)", kh: "អក្សរធំ (A-Z)" },
+   { id: "num", test: (p: string) => /\d/.test(p), en: "One number (0-9)", kh: "លេខ (0-9)" },
+   { id: "sym", test: (p: string) => /[^A-Za-z0-9]/.test(p), en: "One symbol (!@#$%...)", kh: "និមិត្តសញ្ញា (!@#$%...)" },
+]
+
+const isStrongPassword = (p: string) => PASSWORD_RULES.every(r => r.test(p))
+
+const PasswordStrength = ({ password, isKh }: { password: string; isKh: boolean }) => {
+   if (!password) return null
+   const passed = PASSWORD_RULES.filter(r => r.test(password)).length
+   const level =
+      passed <= 2 ? { label: isKh ? "ខ្សោយ" : "Weak", color: "bg-rose-500", text: "text-rose-500" }
+         : passed <= 4 ? { label: isKh ? "មធ្យម" : "Medium", color: "bg-amber-500", text: "text-amber-500" }
+            : { label: isKh ? "រឹងមាំ" : "Strong", color: "bg-emerald-500", text: "text-emerald-500" }
+
+   return (
+      <div className="space-y-2 rounded-lg border border-gray-100 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03] p-3">
+         <div className="flex items-center gap-2">
+            <div className="flex flex-1 gap-1">
+               {PASSWORD_RULES.map((_, i) => (
+                  <div
+                     key={i}
+                     className={cn(
+                        "h-1.5 flex-1 rounded-full transition-colors",
+                        i < passed ? level.color : "bg-gray-200 dark:bg-white/10"
+                     )}
+                  />
+               ))}
+            </div>
+            <span className={cn("text-[12px] font-bold", level.text)}>{level.label}</span>
+         </div>
+         <ul className="grid grid-cols-1 gap-1">
+            {PASSWORD_RULES.map(r => {
+               const ok = r.test(password)
+               return (
+                  <li key={r.id} className={cn(
+                     "flex items-center gap-1.5 text-[12px] transition-colors",
+                     ok ? "text-emerald-600 dark:text-emerald-400" : "text-gray-500 dark:text-white/30"
+                  )}>
+                     {ok ? <Check className="w-3 h-3 shrink-0" /> : <X className="w-3 h-3 shrink-0" />}
+                     {isKh ? r.kh : r.en}
+                  </li>
+               )
+            })}
+         </ul>
+      </div>
+   )
+}
+
 interface UserForm {
    id?: number
    username: string
@@ -201,6 +254,8 @@ export default function UsersPage() {
          err.email = isKh ? "អ៊ីមែលនេះមានរួចហើយ" : "Email already exists"
       if (!currentUser?.id && !currentUser?.password)
          err.password = isKh ? "សូមបញ្ចូលលេខសម្ងាត់" : "Password required"
+      else if (currentUser?.password && !isStrongPassword(currentUser.password))
+         err.password = isKh ? "លេខសម្ងាត់មិនទាន់រឹងមាំគ្រប់គ្រាន់" : "Password is not strong enough"
       if (currentUser?.password && currentUser.password !== currentUser.confirmPassword)
          err.confirmPassword = isKh ? "លេខសម្ងាត់មិនដូចគ្នា" : "Passwords do not match"
       if (Object.keys(err).length > 0) { setErrors(err); return }
@@ -616,6 +671,7 @@ export default function UsersPage() {
                         {errors.confirmPassword && <ErrMsg msg={errors.confirmPassword} />}
                      </div>
                   </div>
+                  <PasswordStrength password={currentUser?.password || ""} isKh={isKh} />
                   <div className="grid grid-cols-2 gap-3">
                      <div className="space-y-1.5">
                         <Label className="text-[14px] text-gray-600 dark:text-white/30">{isKh ? "តួនាទី" : "Role"}</Label>

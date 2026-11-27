@@ -59,27 +59,27 @@ const SEL_I = "text-[14px] text-gray-800 dark:text-white/80 focus:bg-[#03624C]/1
 const KPI = {
    total: {
       bg: "bg-white dark:bg-[#22263a]",
-      border: "border-white dark:border-[#22263a]",
+      border: "border-emerald-100 dark:border-emerald-500/20",
       text: "!text-emerald-600 dark:!text-emerald-400",
       label: "text-gray-600 dark:text-gray-200",
       icon: "text-emerald-600 dark:text-emerald-400",
-      iconBg: "bg-emerald-50 dark:bg-emerald-500/10",
+      iconBg: "bg-emerald-100 dark:bg-emerald-500/20",
    },
    income: {
       bg: "bg-white dark:bg-[#22263a]",
-      border: "border-white dark:border-[#22263a]",
+      border: "border-blue-100 dark:border-blue-500/20",
       text: "!text-blue-600 dark:!text-blue-400",
       label: "text-gray-600 dark:text-gray-200",
       icon: "text-blue-600 dark:text-blue-400",
-      iconBg: "bg-blue-50 dark:bg-blue-500/10",
+      iconBg: "bg-blue-100 dark:bg-blue-500/20",
    },
    expense: {
       bg: "bg-white dark:bg-[#22263a]",
-      border: "border-white dark:border-[#22263a]",
+      border: "border-violet-100 dark:border-violet-500/20",
       text: "!text-[#03624C] dark:!text-violet-400",
       label: "text-gray-600 dark:text-gray-200",
-      icon: "text-[#03624C] dark:text-[#03624C]",
-      iconBg: "bg-violet-50 dark:bg-violet-500/10",
+      icon: "text-[#03624C] dark:text-violet-400",
+      iconBg: "bg-violet-100 dark:bg-violet-500/20",
    },
 }
 
@@ -104,7 +104,7 @@ function KpiCard({
          <Card className={cn("border rounded-xl shadow-lg shadow-black/10 dark:shadow-black/40", style.bg, style.border)}>
             <CardContent className="p-2">
                <div className="flex items-center justify-between gap-3 mb-4">
-                  <p className={cn("flex items-center gap-1.5 min-w-0 text-[14px] uppercase", style.label)}>
+                  <p className={cn("flex items-center gap-1.5 min-w-0 text-[14px] font-bold uppercase", style.label)}>
                      <span className="truncate">{label}</span>
                   </p>
                   <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style.iconBg)}>
@@ -112,7 +112,7 @@ function KpiCard({
                   </div>
                </div>
                <p className={cn(
-                  "text-[22px] text-center leading-none tabular-nums mb-2.5",
+                  "text-[22px] font-bold text-center leading-none tabular-nums mb-2.5",
                   isText && "truncate px-1",
                   style.text
                )}>
@@ -159,7 +159,8 @@ const ErrMsg = ({ msg }: { msg: string }) => (
 export default function FinanceCategoriesPage() {
    const { i18n } = useTranslation("common")
    const isKh = i18n.language === "kh"
-   const { can } = usePermission("finance")
+   // FIX: key ផ្ទាល់ខ្លួន (ធ្លាក់ទៅ "finance" ស្វ័យប្រវត្តិបើ nav មិនមាន key នេះ)
+   const { can } = usePermission("finance-categories")
 
    const { data: categories = [], isLoading: loadingCats, isFetching: fetchingCats, refetch: refetchCats } = useFinanceCategories()
    const { data: expenses = [], isLoading: loadingExps, isFetching: fetchingExps } = useExpensesForCategoryCount()
@@ -242,7 +243,7 @@ export default function FinanceCategoriesPage() {
          }
          setIsDialogOpen(false)
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
       }
    }
 
@@ -260,7 +261,7 @@ export default function FinanceCategoriesPage() {
          setItemToDelete(null)
          setDeleteItemCount(0)
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "លុបមិនបាន" : "Failed to delete"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "លុបមិនបាន" : "Failed to delete"))
       }
    }
 
@@ -280,7 +281,7 @@ export default function FinanceCategoriesPage() {
          return matchSearch && matchType && matchStart && matchEnd
       })
       if (sortConfig.key) {
-         r.sort((a: any, b: any) => {
+         r = [...r].sort((a: any, b: any) => {
             const vA = a[sortConfig.key!] || ""
             const vB = b[sortConfig.key!] || ""
             return sortConfig.direction === "asc"
@@ -293,6 +294,19 @@ export default function FinanceCategoriesPage() {
 
    const incomeCount = useMemo(() => categories.filter((c: ApiFinanceCategory) => c.type === "income").length, [categories])
    const expenseCount = useMemo(() => categories.filter((c: ApiFinanceCategory) => c.type === "expense").length, [categories])
+
+   const dateCell = (raw?: string | null) => {
+      if (!raw) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
+      const d = new Date(raw)
+      const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      return (
+         <div className="flex flex-col gap-0.5">
+            <span className="text-[14px] text-gray-700 dark:text-white/70">{date}</span>
+            <span className="text-[12px] text-gray-400 dark:text-white/30">{time}</span>
+         </div>
+      )
+   }
 
    const columns = [
       {
@@ -332,41 +346,17 @@ export default function FinanceCategoriesPage() {
          key: "created_at",
          header: isKh ? "បង្កើតនៅ" : "Created At",
          sortable: true,
-         render: (item: ApiFinanceCategory) => {
-            const raw = item.created_at || item.date
-            if (!raw) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            const d = new Date(raw)
-            const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
-            const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{date}</span>
-                  <span className="text-[12px] text-gray-400 dark:text-white/30">{time}</span>
-               </div>
-            )
-         },
+         render: (item: ApiFinanceCategory) => dateCell(item.created_at || item.date),
       },
       {
          key: "updated_at",
          header: isKh ? "កែប្រែនៅ" : "Updated At",
          sortable: true,
-         render: (item: ApiFinanceCategory) => {
-            const raw = item.updated_at
-            if (!raw) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            const d = new Date(raw)
-            const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
-            const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{date}</span>
-                  <span className="text-[12px] text-gray-400 dark:text-white/30">{time}</span>
-               </div>
-            )
-         },
+         render: (item: ApiFinanceCategory) => dateCell(item.updated_at),
       },
       {
          key: "record_count",
-         header: isKh ? "ចំនួនកំណត់ត្រា​​" : "Records Count",
+         header: isKh ? "ចំនួនកំណត់ត្រា" : "Records Count",
          render: (item: ApiFinanceCategory) => {
             const count = countForCategory(item.name)
             return (
@@ -425,6 +415,7 @@ export default function FinanceCategoriesPage() {
    ]
 
    const showInitialLoading = loading && categories.length === 0
+   const pending = create.isPending || update.isPending
 
    return (
       <div className="flex h-screen bg-gray-50 dark:bg-[#13151f] overflow-hidden transition-colors duration-300" style={SORA}>
@@ -454,7 +445,6 @@ export default function FinanceCategoriesPage() {
                </div>
             ) : (
                <main className="flex-1 p-5 space-y-4 overflow-hidden flex flex-col">
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 shrink-0">
                      <KpiCard
                         label={isKh ? "ប្រភេទសរុប" : "Total Categories"}
@@ -555,7 +545,7 @@ export default function FinanceCategoriesPage() {
                </main>
             )}
          </div>
-         <Dialog open={isDialogOpen} onOpenChange={v => { if (!(create.isPending || update.isPending)) setIsDialogOpen(v) }}>
+         <Dialog open={isDialogOpen} onOpenChange={v => { if (!pending) setIsDialogOpen(v) }}>
             <DialogContent
                className="max-w-sm p-0 border border-gray-200 dark:border-white/[0.13] shadow-2xl rounded-lg bg-white dark:bg-[#1e2235] flex flex-col [&>button]:hidden"
                style={SORA} >
@@ -638,7 +628,7 @@ export default function FinanceCategoriesPage() {
                         <span className="text-[14px] text-gray-600 dark:text-white/30 w-24 shrink-0">
                            {isKh ? "កែប្រែនៅ" : "Updated"}
                         </span>
-                        <span className="text-[14px]  text-gray-800 dark:text-white/85">
+                        <span className="text-[14px] text-gray-800 dark:text-white/85">
                            {formatDateTime(currentCat.updated_at)}
                         </span>
                      </div>
@@ -649,50 +639,35 @@ export default function FinanceCategoriesPage() {
                         <span className="text-[14px] text-gray-600 dark:text-white/30 w-24 shrink-0">
                            {isKh ? "កាលបរិច្ឆេទ" : "Date"}
                         </span>
-                        <span className="text-[14px]  text-gray-800 dark:text-white/85">
-                           {currentCat.date}
-                        </span>
+                        <span className="text-[14px] text-gray-800 dark:text-white/85">{currentCat.date}</span>
                      </div>
                   )}
                </div>
-               {!isViewMode && (
-                  <DialogFooter className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.07] bg-gray-50 dark:bg-[#1e2235] rounded-b-lg">
-                     <div className="flex justify-end gap-2 w-full">
-                        <button
-                           onClick={() => setIsDialogOpen(false)}
-                           disabled={create.isPending || update.isPending}
-                           className="h-9 px-5 rounded-lg text-[14px] transition-all border border-gray-200 dark:border-white/[0.10] text-gray-600 dark:text-white/50 hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50" >
-                           {isKh ? "បោះបង់" : "Cancel"}
-                        </button>
+               <DialogFooter className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.07] bg-gray-50 dark:bg-[#1e2235] rounded-b-lg">
+                  <div className="flex justify-end gap-2 w-full">
+                     <button
+                        onClick={() => setIsDialogOpen(false)}
+                        disabled={pending}
+                        className="h-9 px-5 rounded-lg text-[14px] transition-all border border-gray-200 dark:border-white/[0.10] text-gray-600 dark:text-white/50 hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50" >
+                        {isViewMode ? (isKh ? "បិទ" : "Close") : (isKh ? "បោះបង់" : "Cancel")}
+                     </button>
+                     {!isViewMode && (
                         <button
                            onClick={handleSave}
-                           disabled={create.isPending || update.isPending}
+                           disabled={pending}
                            className="h-9 px-6 rounded-lg text-[14px] text-white flex items-center gap-2 transition-all disabled:opacity-60 active:scale-[0.97] bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90" >
-                           {(create.isPending || update.isPending) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                           {(create.isPending || update.isPending) ? (isKh ? "កំពុងរក្សា..." : "Saving...") : (isKh ? "រក្សាទុក" : "Save")}
+                           {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                           {pending ? (isKh ? "កំពុងរក្សា..." : "Saving...") : (isKh ? "រក្សាទុក" : "Save")}
                         </button>
-                     </div>
-                  </DialogFooter>
-               )}
-               {isViewMode && (
-                  <DialogFooter className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.07] bg-gray-50 dark:bg-[#1e2235] rounded-b-lg">
-                     <div className="flex justify-end w-full">
-                        <button
-                           onClick={() => setIsDialogOpen(false)}
-                           className="h-9 px-5 rounded-lg text-[14px] transition-all border border-gray-200 dark:border-white/[0.10] text-gray-600 dark:text-white/50 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
-                        >
-                           {isKh ? "បិទ" : "Close"}
-                        </button>
-                     </div>
-                  </DialogFooter>
-               )}
+                     )}
+                  </div>
+               </DialogFooter>
             </DialogContent>
          </Dialog>
          <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
             <AlertDialogContent
                className="rounded-2xl border-0 bg-white dark:bg-[#22263a] shadow-2xl p-0 max-w-[400px] overflow-hidden"
                style={SORA} >
-               <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-400" />
                <div className="p-6">
                   <div className="flex items-start gap-4 mb-4">
                      <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 flex items-center justify-center shrink-0">

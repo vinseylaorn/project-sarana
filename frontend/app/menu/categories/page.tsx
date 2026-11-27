@@ -379,22 +379,22 @@ export default function MenuCategoriesPage() {
                      <Label className={cn("text-[14px]  text-gray-600 dark:text-white/30",
                         nameError && "text-rose-500"
                      )}>
-                     {!isViewMode && ( <>
-                        {isKh ? "ឈ្មោះប្រភេទ" : "Category Name"}
+                        {!isViewMode && (<>
+                           {isKh ? "ឈ្មោះប្រភេទ" : "Category Name"}
                            <span className="text-rose-500 ml-0.5">*</span>
                         </>
-                     )}
+                        )}
                      </Label>
                      {isViewMode ? (
                         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-[#22263a]">
-                        <Tags className={cn("w-3.5 h-3.5 shrink-0", ACCENT_CLASS.text)} />
-                        <span className="text-[14px]  text-gray-800 dark:text-white/30 w-20 shrink-0">
-                           {isKh ? "ប្រភេទ" : "Category"}
-                        </span>
-                        <span className="text-[14px]  text-gray-800 dark:text-white/85">
+                           <Tags className={cn("w-3.5 h-3.5 shrink-0", ACCENT_CLASS.text)} />
+                           <span className="text-[14px]  text-gray-800 dark:text-white/30 w-20 shrink-0">
+                              {isKh ? "ប្រភេទ" : "Category"}
+                           </span>
+                           <span className="text-[14px]  text-gray-800 dark:text-white/85">
                               {currentCat?.name}
                            </span>
-                     </div>
+                        </div>
                      ) : (
                         <>
                            <input
@@ -474,7 +474,6 @@ export default function MenuCategoriesPage() {
          </Dialog>
          <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
             <AlertDialogContent className="rounded-2xl border-0 bg-white dark:bg-[#22263a] shadow-2xl p-0 max-w-[400px] overflow-hidden">
-               <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-400" />
                <div className="p-6">
                   <div className="flex items-start gap-4 mb-4">
                      <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 flex items-center justify-center shrink-0">

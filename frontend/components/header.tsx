@@ -39,7 +39,7 @@ const ALL_PAGES = flattenNav(navigation)
 const NOTIF_STYLE: Record<string, { icon: ReactElement; bg: string }> = {
   warning: { icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />, bg: "bg-amber-50 dark:bg-amber-500/10" },
   success: { icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />, bg: "bg-emerald-50 dark:bg-emerald-500/10" },
-  info:    { icon: <Info className="w-3.5 h-3.5 text-indigo-500" />,          bg: "bg-indigo-50 dark:bg-indigo-500/10" },
+  info: { icon: <Info className="w-3.5 h-3.5 text-indigo-500" />, bg: "bg-indigo-50 dark:bg-indigo-500/10" },
 }
 const notifStyle = (type: string) => NOTIF_STYLE[type] ?? NOTIF_STYLE.info
 
@@ -60,9 +60,6 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Only used for the sun/moon icon swap now — a discrete icon change has
-  // no visible "flash" the way an animated color transition does, so it's
-  // safe to gate this on `mounted` without any special handling.
   const isDark = mounted && resolvedTheme === "dark"
 
   useEffect(() => {
@@ -87,9 +84,9 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   const results = query.trim().length > 0
     ? ALL_PAGES.filter(p =>
-        p.name.toLowerCase().includes(query.toLowerCase()) ||
-        (p.parent && p.parent.toLowerCase().includes(query.toLowerCase()))
-      )
+      p.name.toLowerCase().includes(query.toLowerCase()) ||
+      (p.parent && p.parent.toLowerCase().includes(query.toLowerCase()))
+    )
     : []
   useEffect(() => { setHighlighted(0) }, [results.length])
 
@@ -158,7 +155,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               text-gray-900 dark:text-white/80
               placeholder-gray-600 dark:placeholder-white/[0.28]
               hover:border-gray-300 dark:hover:border-white/[0.14]
-              focus:border-indigo-500/55 dark:focus:border-indigo-500/55
+              focus:border-[#03624C] dark:focus:border-indigo-500/55
               transition-colors duration-200"
           />
           {query && (
@@ -220,7 +217,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                     {isHl && (
                       <kbd className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0
                         bg-indigo-200 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300" >
-                          ↵
+                        ↵
                       </kbd>
                     )}
                   </button>
@@ -259,7 +256,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               text-gray-500 dark:text-white/40
               hover:text-gray-900 dark:hover:text-white/[0.92]
               hover:bg-gray-100 dark:hover:bg-white/[0.06]" >
-              <Bell className="w-4 h-4" />
+            <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-[7px] h-[7px] rounded-full bg-indigo-500 border-2
                 border-white dark:border-[#1e2235]" />
@@ -291,7 +288,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                       className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg transition-all
                         text-indigo-700 dark:text-indigo-300
                         hover:bg-indigo-100 dark:hover:bg-indigo-500/20" >
-                        <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                      <CheckCheck className="w-3.5 h-3.5" /> Mark all read
                     </button>
                   )}
                   {notifications.length > 0 && (

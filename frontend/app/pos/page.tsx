@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Smartphone, ShoppingBag, Clock, Plus } from "lucide-react";
+import { Loader2, Smartphone, ShoppingBag, Clock, Plus, ArrowLeftRight, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   setGlobalTables, getGlobalTables,
@@ -36,6 +36,7 @@ import { reservationsApi } from "@/lib/api/reservations";
 import { clearPosSession } from "@/components/posflowlogin/shared";
 import { useSettings } from "@/lib/settings-context";
 import { token } from "@/lib/auth/token";
+import { useTableTransfer } from "@/hooks/use-table-transfer"; // NEW
 
 const SORA: React.CSSProperties = { fontFamily: "var(--font-kantumruy), sans-serif" };
 
@@ -175,6 +176,7 @@ export default function POSPage() {
           reserveTime: t.reserve_time ?? undefined,
           reservedBy,
           reservedPhone,
+          mergedInto: t.merged_into ?? undefined, // NEW: set when this table was merged into another table's bill
           isOrderConfirmed: t.status === "occupied",
           order: savedOrder?.items?.length
             ? { id: `ORD-${t.id}`, items: savedOrder.items, total: savedOrder.total }
@@ -255,7 +257,36 @@ export default function POSPage() {
     }
   }, []);
 
-  const openPOS = useCallback((table: PosTable, external = false) => {
+  // NEW: Transfer / Merge table (state + dialog in one hook)
+  const tt = useTableTransfer({
+    tables,
+    isKh,
+    onSuccess: async () => {
+      // the open table changed on the server -> close the POS and reload fresh data
+      setPosOpen(false);
+      setSelectedTable(null);
+      setOrderItems([]);
+      setPendingItems([]);
+      setCurrentOrderId(null);
+      setNoteItems({});
+      setNoteEditId(null);
+      await loadTables();
+    },
+  });
+
+  const openPOS = useCallback((tableArg: PosTable, external = false) => {
+    // NEW: a table merged into another table's bill opens that main table instead
+    let table = tableArg;
+    if (!external && table.mergedInto) {
+      const main = tables.find((t) => t.name === table.mergedInto);
+      if (main) {
+        toastWarn(isKh
+          ? `តុនេះបានបញ្ចូលជាមួយ ${main.name}`
+          : `This table is merged with ${main.name}`);
+        table = main;
+      }
+    }
+
     if (selectedTable && posOpen && !checkoutOpen && orderItems.length > 0 && !selectedTable.isOrderConfirmed) {
       const existingDraft = draftOrders.some(d => d.id === selectedTable.id);
       if (!existingDraft) {
@@ -302,7 +333,7 @@ export default function POSPage() {
     setNoteItems({});
     setNoteEditId(null);
     setPosOpen(true);
-  }, [selectedTable, posOpen, checkoutOpen, orderItems, draftOrders, isKh, loadMenu]);
+  }, [tables, selectedTable, posOpen, checkoutOpen, orderItems, draftOrders, isKh, loadMenu]);
 
   const syncTables = (updated: PosTable[]) => { setTables(updated); setGlobalTables(updated); };
   const syncExternal = (orders: any[]) => { setExternalOrders(orders); saveExternalOrders(orders); };
@@ -712,6 +743,10 @@ export default function POSPage() {
   const checkoutItems = [...orderItems, ...pendingItems];
   const checkoutTotal = checkoutItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
+  // NEW: Transfer / Merge only for a dine-in table that already has a confirmed order
+  const canTableActions = isOccupied && isOrderConfirmed && !checkoutOpen && orderItems.length > 0;
+  const tableActionsLocked = pendingItems.length > 0; // unsent extra items would be lost
+
   const handleNoteEditStart = (id: string, current: string) => { setNoteEditId(id); setNoteEditValue(current); };
   const handleNoteEditSave = (id: string, value: string) => {
     setNoteItems((p) => ({ ...p, [id]: value }));
@@ -778,7 +813,6 @@ export default function POSPage() {
             className="h-7 w-[128px] justify-center flex items-center gap-1.5 rounded-lg border text-[14px] font-semibold bg-[#03624C]/10 border-[#03624C]/30 text-[#03624C] hover:bg-[#03624C]/20 transition-all">
             <Smartphone className="w-4 h-4" /> App
           </button>
-
           <button
             onClick={() => openPOS({ id: `TK-${Date.now()}`, name: "Takeaway", seats: 0, floor: "", status: "available", order: { id: `TK-ORD-${Date.now()}`, items: [], total: 0 } }, true)}
             className="h-7 w-[128px] justify-center flex items-center gap-1.5 rounded-lg border text-[14px] font-semibold bg-[#03624C]/10 border-[#03624C]/30 text-[#03624C] hover:bg-[#03624C]/20 transition-all">
@@ -794,7 +828,33 @@ export default function POSPage() {
           className="sm:max-w-[1300px] w-full h-[90vh] flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl p-0 left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] [&>button]:hidden"
           style={SORA} >
           <DialogTitle className="sr-only">POS Order Dialog</DialogTitle>
-          <div className="flex h-full min-h-0">
+
+          {/* NEW: Transfer / Merge bar (only for a confirmed dine-in table) */}
+          {canTableActions && (
+            <div className="h-10 px-4 flex items-center justify-between border-b border-gray-100 bg-gray-50 shrink-0">
+              <span className="text-[13px] font-semibold text-gray-600">{selectedTable?.name}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={tableActionsLocked}
+                  title={tableActionsLocked ? (isKh ? "សូមបញ្ជាក់មុខម្ហូបបន្ថែមជាមុន" : "Confirm the extra items first") : undefined}
+                  onClick={() => tt.open("transfer", selectedTable)}
+                  className="h-7 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                  {isKh ? "ប្តូរតុ" : "Transfer"}
+                </button>
+                <button
+                  disabled={tableActionsLocked}
+                  title={tableActionsLocked ? (isKh ? "សូមបញ្ជាក់មុខម្ហូបបន្ថែមជាមុន" : "Confirm the extra items first") : undefined}
+                  onClick={() => tt.open("merge", selectedTable)}
+                  className="h-7 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  <Link2 className="w-3.5 h-3.5" />
+                  {isKh ? "បញ្ចូលតុ" : "Merge"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-1 min-h-0">
             <MenuPanel
               isKh={isKh} categories={categories} filteredMenu={filteredMenu}
               activeCategory={activeCategory} searchQuery={searchQuery}
@@ -864,6 +924,9 @@ export default function POSPage() {
         orderType={selectedTable?.name || ""} orderId={currentOrderId}
         language={i18n.language as any}
       />
+
+      {/* NEW: Transfer / Merge dialog */}
+      {tt.dialog}
     </div>
   );
 }

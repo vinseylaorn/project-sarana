@@ -7,10 +7,12 @@ import type { Order } from "@/types"
 
 interface Props { orders: Order[]; isKh: boolean }
 
+const LIMIT = 5
+
 export function TransactionsTable({ orders, isKh }: Props) {
    const { resolvedTheme } = useTheme()
    const isDark = resolvedTheme === "dark"
-   const rows = orders.slice(0, 20)
+   const rows = orders.slice(0, LIMIT)
 
    const accentText = isDark ? "text-[#4d80e8]" : "text-[#03624C]"
    const accentBadge = isDark ? "bg-[#1857D8]/10 text-[#4d80e8]" : "bg-[#03624C]/[0.08] text-[#03624C]"

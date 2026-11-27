@@ -47,8 +47,19 @@ const ErrorMsg = ({ msg }: { msg: string }) => (
 export default function SuppliersPage() {
    const { t, i18n } = useTranslation("common")
    const isKh = i18n.language === "kh"
-   const { can } = usePermission("suppliers")
+   const { can } = usePermission("supplier")
    const originalSnapshot = useRef<string>("")
+
+   const canView = can("view")
+   const canCreate = can("create")
+   const canEdit = can("edit")
+   const canDelete = can("delete")
+
+   const deny = () =>
+      toastWarn(
+         isKh ? "គ្មានសិទ្ធិ" : "Permission denied",
+         isKh ? "អ្នកមិនមានសិទ្ធិធ្វើសកម្មភាពនេះទេ" : "You don't have permission to do this",
+      )
 
    const {
       data: suppliers = [],
@@ -118,6 +129,7 @@ export default function SuppliersPage() {
    }, [suppliers, isKh])
 
    const handleOpenAdd = () => {
+      if (!canCreate) return deny()
       setIsViewMode(false)
       setCurrent({ name: "", contact_name: "", phone: "", email: "", address: "", category_id: null, status: "Active", note: "" })
       setErrors({})
@@ -128,6 +140,7 @@ export default function SuppliersPage() {
    }
 
    const handleOpenEdit = (item: Supplier) => {
+      if (!canEdit) return deny()
       setIsViewMode(false)
       setCurrent({ ...item })
       setErrors({})
@@ -141,6 +154,19 @@ export default function SuppliersPage() {
       setIsDialogOpen(true)
    }
 
+   const handleOpenView = (item: Supplier) => {
+      if (!canView) return deny()
+      setCurrent(item)
+      setIsViewMode(true)
+      setIsDialogOpen(true)
+   }
+
+   const handleOpenDelete = (item: Supplier) => {
+      if (!canDelete) return deny()
+      setItemToDelete(item)
+      setIsDeleteAlertOpen(true)
+   }
+
    const handlePhoneChange = (raw: string) => {
       const formatted = formatKhmerPhone(raw)
       setCurrent((prev: any) => ({ ...prev, phone: formatted }))
@@ -148,6 +174,9 @@ export default function SuppliersPage() {
    }
 
    const handleSave = async () => {
+      // ពិនិត្យសិទ្ធិតាមប្រភេទសកម្មភាព
+      if (current?.id ? !canEdit : !canCreate) return deny()
+
       const newErrors: Record<string, string> = {}
 
       if (!current?.name?.trim())
@@ -214,6 +243,7 @@ export default function SuppliersPage() {
    }
 
    const confirmDelete = async () => {
+      if (!canDelete) return deny()
       if (!itemToDelete) return
       try {
          await remove.mutateAsync(itemToDelete.id)
@@ -242,7 +272,7 @@ export default function SuppliersPage() {
          return matchSearch && matchStatus && matchCat
       })
       if (sortConfig.key) {
-         result.sort((a: any, b: any) => {
+         result = [...result].sort((a: any, b: any) => {
             if (a[sortConfig.key!] < b[sortConfig.key!]) return sortConfig.direction === "asc" ? -1 : 1
             if (a[sortConfig.key!] > b[sortConfig.key!]) return sortConfig.direction === "asc" ? 1 : -1
             return 0
@@ -270,7 +300,10 @@ export default function SuppliersPage() {
       [categories, catSearch],
    )
 
-   const columns = [
+   // បង្ហាញជួរ Actions តែពេលមានសិទ្ធិយ៉ាងហោចណាស់មួយ
+   const showActions = canView || canEdit || canDelete
+
+   const baseColumns = [
       {
          key: "no",
          header: isKh ? "ល.រ" : "No.",
@@ -349,14 +382,17 @@ export default function SuppliersPage() {
             </div>
          ),
       },
-      {
-         key: "actions",
-         header: isKh ? "សកម្មភាព" : "Actions",
-         className: "text-right",
-         render: (item: Supplier) => (
-            <div className="flex items-center justify-end gap-1.5">
+   ]
+
+   const actionsColumn = {
+      key: "actions",
+      header: isKh ? "សកម្មភាព" : "Actions",
+      className: "text-right",
+      render: (item: Supplier) => (
+         <div className="flex items-center justify-end gap-1.5">
+            {canView && (
                <button
-                  onClick={() => { setCurrent(item); setIsViewMode(true); setIsDialogOpen(true) }}
+                  onClick={() => handleOpenView(item)}
                   className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
                   text-blue-700 bg-blue-50 border border-blue-200
                   hover:bg-blue-100 hover:border-blue-300
@@ -366,35 +402,38 @@ export default function SuppliersPage() {
                   title={isKh ? "មើលព័ត៌មាន" : "View Details"} >
                   <Eye className="w-3.5 h-3.5" />
                </button>
-               {can("edit") && (
-                  <button
-                     onClick={() => handleOpenEdit(item)}
-                     className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
-                     text-amber-700 bg-amber-50 border border-amber-200
-                     hover:bg-amber-100 hover:border-amber-300
-                     dark:text-amber-300 dark:bg-amber-900/20 dark:border-amber-700/40
-                     dark:hover:bg-amber-900/40 dark:hover:border-amber-500
-                     transition-all duration-150"
-                     title={isKh ? "កែប្រែ" : "Edit"} >
-                     <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-               )}
-               {can("delete") && (
-                  <button
-                     onClick={() => { setItemToDelete(item); setIsDeleteAlertOpen(true) }}
-                     className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
-                     text-rose-700 bg-rose-50 border border-rose-200
-                     hover:bg-rose-100 hover:border-rose-300
-                     dark:text-rose-300 dark:bg-rose-900/20 dark:border-rose-700/40
-                     dark:hover:bg-rose-900/40 dark:hover:border-rose-500
-                     transition-all duration-150" >
-                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-               )}
-            </div>
-         ),
-      },
-   ]
+            )}
+            {canEdit && (
+               <button
+                  onClick={() => handleOpenEdit(item)}
+                  className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
+                  text-amber-700 bg-amber-50 border border-amber-200
+                  hover:bg-amber-100 hover:border-amber-300
+                  dark:text-amber-300 dark:bg-amber-900/20 dark:border-amber-700/40
+                  dark:hover:bg-amber-900/40 dark:hover:border-amber-500
+                  transition-all duration-150"
+                  title={isKh ? "កែប្រែ" : "Edit"} >
+                  <Edit2 className="w-3.5 h-3.5" />
+               </button>
+            )}
+            {canDelete && (
+               <button
+                  onClick={() => handleOpenDelete(item)}
+                  className="w-[30px] h-[30px] flex items-center justify-center rounded-lg
+                  text-rose-700 bg-rose-50 border border-rose-200
+                  hover:bg-rose-100 hover:border-rose-300
+                  dark:text-rose-300 dark:bg-rose-900/20 dark:border-rose-700/40
+                  dark:hover:bg-rose-900/40 dark:hover:border-rose-500
+                  transition-all duration-150"
+                  title={isKh ? "លុបចោល" : "Delete"} >
+                  <Trash2 className="w-3.5 h-3.5" />
+               </button>
+            )}
+         </div>
+      ),
+   }
+
+   const columns = showActions ? [...baseColumns, actionsColumn] : baseColumns
 
    const showInitialLoading = loading && suppliers.length === 0
 
@@ -516,7 +555,7 @@ export default function SuppliersPage() {
                            <RefreshCw className={cn("w-3.5 h-3.5", isFetching && "animate-spin")} />
                         </button>
                      </div>
-                     {can("create") && (
+                     {canCreate && (
                         <button
                            onClick={handleOpenAdd}
                            className="h-9 px-4 flex items-center gap-1.5 rounded-lg text-[14px] text-white transition-all active:scale-[0.97] bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90" >

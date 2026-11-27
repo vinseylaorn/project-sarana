@@ -7,8 +7,9 @@ export interface PosTable {
   floor: string
   status: 'available' | 'occupied' | 'reserved'
   reserveTime?: string
-  reservedBy?: string       
-  reservedPhone?: string    
+  reservedBy?: string
+  reservedPhone?: string
+  mergedInto?: string        // ← បន្ថែមបន្ទាត់នេះ
   isOrderConfirmed?: boolean
   order?: {
     id: string
@@ -18,24 +19,24 @@ export interface PosTable {
 }
 
 export interface PosMenuItem {
-  id:           string | number
-  name:         string
-  price:        number
-  category:     string
+  id: string | number
+  name: string
+  price: number
+  category: string
   category_id?: number
-  image?:       string | null
-  available:    boolean
+  image?: string | null
+  available: boolean
 }
 
 export interface PosMenuCategory {
-  id:   string | number
+  id: string | number
   name: string
 }
 
 export interface StoredTableOrder {
   tableId: number
-  items:   any[]
-  total:   number
+  items: any[]
+  total: number
 }
 
 // ── Safe localStorage ─────────────────────────────────────────────
@@ -48,7 +49,7 @@ function ls<T>(key: string, fallback: T): T {
 }
 function lsSave<T>(key: string, val: T): void {
   if (typeof window === "undefined") return
-  try { localStorage.setItem(key, JSON.stringify(val)) } catch {}
+  try { localStorage.setItem(key, JSON.stringify(val)) } catch { }
 }
 
 // ── Keys ──────────────────────────────────────────────────────────
@@ -105,4 +106,4 @@ export const clearTableOrder = (tableId: number) => {
 
 // ── External Orders ───────────────────────────────────────────────
 export const saveExternalOrders = (orders: any[]) => lsSave(KE, orders)
-export const getExternalOrders  = (): any[]        => ls<any[]>(KE, [])
+export const getExternalOrders = (): any[] => ls<any[]>(KE, [])

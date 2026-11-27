@@ -12,24 +12,24 @@ import { LogoutDialog } from "@/components/logout-dialog"
 import { getAvatarUrl } from "@/lib/avatar"
 import {
   LayoutDashboard, ShoppingCart, UtensilsCrossed, Package, Users, History,
-  BarChart3, LogOut, ChevronLeft, ChevronRight, ChevronDown, Trash2, ClipboardList, 
-  Settings, ShieldCheck, UserCog, TrendingUp, CalendarCheck, TrendingDown, 
+  BarChart3, LogOut, ChevronLeft, ChevronRight, ChevronDown, Trash2, ClipboardList,
+  Settings, ShieldCheck, UserCog, TrendingUp, CalendarCheck, TrendingDown,
   BadgeDollarSign, Wallet, ListTree, Tags, Settings2, LayoutGrid, Truck, BadgePercent, Sun, Moon,
 } from "lucide-react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { VipCardIcon } from "@/components/ui/vip-card"
 
 export interface NavItem {
-  name:           string
-  href?:          string
-  icon:           any
-  key:            string
-  pageKey?:       string   
-  labelKh:        string
-  isDropdown?:    boolean
+  name: string
+  href?: string
+  icon: any
+  key: string
+  pageKey?: string
+  labelKh: string
+  isDropdown?: boolean
   hideInSidebar?: boolean
-  hideForAdmin?:  boolean
-  subItems?:      NavItem[]
+  hideForAdmin?: boolean
+  subItems?: NavItem[]
 }
 
 export const navigation: NavItem[] = [
@@ -45,11 +45,11 @@ export const navigation: NavItem[] = [
     hideInSidebar: true,
   },
   {
-    name: "Menu", icon: UtensilsCrossed,
+    name: "Menus", icon: UtensilsCrossed,
     key: "menu_group", isDropdown: true, labelKh: "មុខម្ហូប",
     subItems: [
-      { name: "Menu List",  href: "/menu",            icon: ListTree, key: "menulist",       pageKey: "menu", labelKh: "បញ្ជីមុខម្ហូប" },
-      { name: "Categories", href: "/menu/categories", icon: Tags,     key: "menucategories", pageKey: "menu-categories", labelKh: "ប្រភេទម្ហូប" },
+      { name: "Menu List", href: "/menu", icon: ListTree, key: "menulist", pageKey: "menu", labelKh: "បញ្ជីមុខម្ហូប" },
+      { name: "Categories", href: "/menu/categories", icon: Tags, key: "menucategories", pageKey: "menu-categories", labelKh: "ប្រភេទម្ហូប" },
     ],
   },
   {
@@ -72,66 +72,67 @@ export const navigation: NavItem[] = [
     name: "Inventory", icon: Package,
     key: "inventory_group", isDropdown: true, labelKh: "ស្តុកទំនិញ",
     subItems: [
-      { name: "Stock",         href: "/inventory",               icon: Package,       key: "inventory",    pageKey: "inventory",        labelKh: "បញ្ជីស្តុក" },
-      { name: "Categories",    href: "/inventory/categories",    icon: ListTree,      key: "inv_cats",     pageKey: "inventory-categories", labelKh: "ប្រភេទស្តុក" },
-      { name: "Supplier",      href: "/inventory/suppliers",     icon: Truck,         key: "supplier",     pageKey: "supplier",         labelKh: "អ្នកផ្គត់ផ្គង់" },
-      { name: "Spoilage",      href: "/inventory/spoilage",      icon: Trash2,        key: "spoilage",     pageKey: "spoilage",         labelKh: "ទំនិញខូច" },
-      { name: "Stock History", href: "/inventory/stock-history", icon: ClipboardList, key: "stockhistory", pageKey: "stock-history",    labelKh: "ប្រវត្តិស្តុក" },
+      { name: "Stock", href: "/inventory", icon: Package, key: "inventory", pageKey: "inventory", labelKh: "បញ្ជីស្តុក" },
+      { name: "Categories", href: "/inventory/categories", icon: ListTree, key: "inv_cats", pageKey: "inventory-categories", labelKh: "ប្រភេទស្តុក" },
+      { name: "Supplier", href: "/inventory/suppliers", icon: Truck, key: "supplier", pageKey: "supplier", labelKh: "អ្នកផ្គត់ផ្គង់" },
+      { name: "Spoilage", href: "/inventory/spoilage", icon: Trash2, key: "spoilage", pageKey: "spoilage", labelKh: "ទំនិញខូច" },
+      { name: "Stock History", href: "/inventory/stock-history", icon: ClipboardList, key: "stockhistory", pageKey: "stock-history", labelKh: "ប្រវត្តិស្តុក" },
     ],
   },
   {
     name: "Sales", icon: BadgeDollarSign,
     key: "sales_group", isDropdown: true, labelKh: "ការលក់",
     subItems: [
-      { name: "Transactions",  href: "/payments", icon: History,       key: "transaction",    pageKey: "transactions",   labelKh: "ប្រតិបត្តិការ" },
-      { name: "Order History", href: "/orders",   icon: ClipboardList, key: "orders-history", pageKey: "orders-history", labelKh: "ប្រវត្តិលក់" },
+      { name: "Transactions", href: "/payments", icon: History, key: "transaction", pageKey: "transactions", labelKh: "ប្រតិបត្តិការ" },
+      { name: "Order History", href: "/orders", icon: ClipboardList, key: "orders-history", pageKey: "orders-history", labelKh: "ប្រវត្តិលក់" },
     ],
   },
   {
     name: "Records", icon: Wallet,
     key: "accounting_group", isDropdown: true, labelKh: "កំណត់ត្រា",
     subItems: [
-      { name: "Income",     href: "/records/income",     icon: TrendingUp,   key: "income",      pageKey: "income",            labelKh: "ចំណូល" },
-      { name: "Categories", href: "/records/categories", icon: Tags,         key: "rcategories", pageKey: "finance-categories", labelKh: "ប្រភេទ" },
-      { name: "Expenses",   href: "/records/expense",    icon: TrendingDown, key: "expense",     pageKey: "expense",           labelKh: "ចំណាយ" },
+      { name: "Income", href: "/records/income", icon: TrendingUp, key: "income", pageKey: "income", labelKh: "ចំណូល" },
+      { name: "Categories", href: "/records/categories", icon: Tags, key: "rcategories", pageKey: "finance-categories", labelKh: "ប្រភេទ" },
+      { name: "Expenses", href: "/records/expense", icon: TrendingDown, key: "expense", pageKey: "expense", labelKh: "ចំណាយ" },
     ],
   },
   {
     name: "Reports", icon: BarChart3,
     key: "reports_group", isDropdown: true, labelKh: "របាយការណ៍",
     subItems: [
-      { name: "Overview",     href: "/reports",        icon: BarChart3, key: "overview-report", pageKey: "overview-report", labelKh: "របាយការណ៍លក់" },
-      { name: "Shift Report", href: "/reports/shifts", icon: History,   key: "shift-report",    pageKey: "shift-report",    labelKh: "របាយការណ៍វេន" },
+      { name: "Overview", href: "/reports", icon: BarChart3, key: "overview-report", pageKey: "overview-report", labelKh: "របាយការណ៍លក់" },
+      { name: "Shift Report", href: "/reports/shifts", icon: History, key: "shift-report", pageKey: "shift-report", labelKh: "របាយការណ៍វេន" },
+      { name: "Inventory", href: "/reports/inventory", icon: Package, key: "inventory-report", pageKey: "inventory-report", labelKh: "របាយការណ៍ស្តុក" },
     ],
   },
   {
     name: "Settings", icon: Settings,
     key: "settings_group", isDropdown: true, labelKh: "ការកំណត់",
     subItems: [
-      { name: "General Settings", href: "/settings/general",    icon: Settings2,   key: "general",    pageKey: "general-settings", labelKh: "ការកំណត់ទូទៅ" },
-      { name: "Staff",            href: "/settings/staff",      icon: Users,       key: "staff",      pageKey: "staff",            labelKh: "បុគ្គលិក" },
-      { name: "Users",            href: "/settings/users",      icon: UserCog,     key: "users",      pageKey: "users",            labelKh: "អ្នកប្រើប្រាស់" },
-      { name: "Role",             href: "/settings/role",       icon: ShieldCheck, key: "roles",      pageKey: "roles",            labelKh: "កំណត់សិទ្ធិ" },
-      { name: "Working Shifts",   href: "/settings/workshifts", icon: History,     key: "workshifts", pageKey: "workshifts",     labelKh: "វេនធ្វើការ" },
+      { name: "General Settings", href: "/settings/general", icon: Settings2, key: "general", pageKey: "general-settings", labelKh: "ការកំណត់ទូទៅ" },
+      { name: "Staff", href: "/settings/staff", icon: Users, key: "staff", pageKey: "staff", labelKh: "បុគ្គលិក" },
+      { name: "Users", href: "/settings/users", icon: UserCog, key: "users", pageKey: "users", labelKh: "អ្នកប្រើប្រាស់" },
+      { name: "Role", href: "/settings/role", icon: ShieldCheck, key: "roles", pageKey: "roles", labelKh: "កំណត់សិទ្ធិ" },
+      { name: "Working Shifts", href: "/settings/workshifts", icon: History, key: "workshifts", pageKey: "workshifts", labelKh: "វេនធ្វើការ" },
     ],
   },
 ]
 
 const SECTION_MAP: Record<string, string> = {
-  dashboard:        "MAIN",
-  menu_group:       "OPERATIONS",
-  reserved:         "OPERATIONS",
-  discount:         "OPERATIONS",
-  tables:           "OPERATIONS",
-  inventory_group:  "MANAGE",
-  sales_group:      "MANAGE",
+  dashboard: "MAIN",
+  menu_group: "OPERATIONS",
+  reserved: "OPERATIONS",
+  discount: "OPERATIONS",
+  tables: "OPERATIONS",
+  inventory_group: "MANAGE",
+  sales_group: "MANAGE",
   accounting_group: "MANAGE",
-  reports_group:    "ANALYTICS",
-  settings_group:   "SYSTEM",
+  reports_group: "ANALYTICS",
+  settings_group: "SYSTEM",
 }
 function getSectionLabel(key: string): string | null { return SECTION_MAP[key] ?? null }
 
-const SCROLL_STORAGE_KEY    = "sidebar-scroll-pos"
+const SCROLL_STORAGE_KEY = "sidebar-scroll-pos"
 const COLLAPSED_STORAGE_KEY = "sidebar-collapsed"
 
 function getInitialCollapsed(): boolean {
@@ -151,12 +152,12 @@ export function Sidebar() {
   const { t, i18n } = useTranslation("common")
   const { resolvedTheme, setTheme } = useTheme()
   const isKh = i18n.language === "kh"
-  const [collapsed,        setCollapsed]        = useState<boolean>(getInitialCollapsed)
+  const [collapsed, setCollapsed] = useState<boolean>(getInitialCollapsed)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
-  const [openMenus,        setOpenMenus]        = useState<Record<string, boolean>>({})
-  const [mounted,          setMounted]          = useState(false)
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
+  const [mounted, setMounted] = useState(false)
 
-  const navRef       = useRef<HTMLElement | null>(null)
+  const navRef = useRef<HTMLElement | null>(null)
   const scrollPosRef = useRef(0)
 
   useLayoutEffect(() => {
@@ -188,12 +189,14 @@ export function Sidebar() {
   const isDark = !mounted || resolvedTheme === "dark"
 
   const displayName = user?.username || "User"
-  const isAdmin     = ["administrator", "admin"].includes((user?.role ?? "").toLowerCase())
+  const isAdmin = ["administrator", "admin"].includes((user?.role ?? "").toLowerCase())
 
   const canViewPage = (pageKey?: string): boolean => {
     if (!pageKey) return true
-    if (isAdmin)  return true
-    return user?.permissions?.[pageKey]?.view === true
+    if (isAdmin) return true
+    const p = user?.permissions?.[pageKey]
+    // បង្ហាញ menu បើមានសិទ្ធិណាមួយ មិនមែនតែ view
+    return !!p && (p.view === true || p.create === true || p.edit === true || p.delete === true)
   }
 
   const visibleSubItems = (subItems?: NavItem[]) =>
@@ -238,7 +241,7 @@ export function Sidebar() {
   const avatarUrl = getAvatarUrl(user?.image)
   const renderedSections = new Set<string>()
 
-  const onHoverIn  = (el: HTMLElement, active: boolean) => {
+  const onHoverIn = (el: HTMLElement, active: boolean) => {
     if (!active) { el.style.background = "var(--sb-hover)"; el.style.color = "var(--sb-text)" }
   }
   const onHoverOut = (el: HTMLElement, active: boolean) => {
@@ -316,7 +319,7 @@ export function Sidebar() {
           borderColor: "var(--sb-border)",
           transition: "width 0.3s ease, background 0.35s ease",
         }}
-        >
+      >
         <div className="pointer-events-none absolute top-0 right-0 w-32 h-32 rounded-full opacity-[0.14] blur-3xl"
           style={{ background: "var(--sb-blob)" }} />
         <div className="pointer-events-none absolute bottom-32 left-0 w-24 h-24 rounded-full opacity-[0.07] blur-2xl"
@@ -350,10 +353,10 @@ export function Sidebar() {
         >
           {navigation.map(item => {
             if (!isGroupVisible(item)) return null
-            const Icon           = item.icon
+            const Icon = item.icon
             const translatedName = getTranslatedName(item)
-            const sectionLabel   = getSectionLabel(item.key)
-            const showLabel      = !collapsed && sectionLabel != null && !renderedSections.has(sectionLabel)
+            const sectionLabel = getSectionLabel(item.key)
+            const showLabel = !collapsed && sectionLabel != null && !renderedSections.has(sectionLabel)
             if (showLabel && sectionLabel) renderedSections.add(sectionLabel)
             const visibleSubs = isAdmin
               ? (item.subItems ?? [])
@@ -403,7 +406,7 @@ export function Sidebar() {
                       <div className="ml-[26px] pl-3 mt-1.5 mb-2 space-y-1"
                         style={{ borderLeft: "2px solid var(--sb-divider)" }}>
                         {visibleSubs.map(sub => {
-                          const SubIcon  = sub.icon
+                          const SubIcon = sub.icon
                           const isActive = pathname === sub.href
                           return (
                             <Link key={sub.key} href={sub.href || "#"}>
@@ -470,16 +473,16 @@ export function Sidebar() {
               style={{ background: "var(--sb-badge)", border: "1px solid var(--sb-badge-border)" }}>
               {avatarUrl
                 ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer"
-                    onError={e => {
-                      const tg = e.target as HTMLImageElement; tg.style.display = "none"
-                      const p = tg.parentElement
-                      if (p && !p.querySelector("span.avatar-fallback")) {
-                        const s = document.createElement("span"); s.className = "avatar-fallback"
-                        s.style.cssText = "color:#fff;font-weight:900;font-size:13px"
-                        s.textContent = displayName.charAt(0).toUpperCase(); p.appendChild(s)
-                      }
-                    }}
-                  />
+                  onError={e => {
+                    const tg = e.target as HTMLImageElement; tg.style.display = "none"
+                    const p = tg.parentElement
+                    if (p && !p.querySelector("span.avatar-fallback")) {
+                      const s = document.createElement("span"); s.className = "avatar-fallback"
+                      s.style.cssText = "color:#fff;font-weight:900;font-size:13px"
+                      s.textContent = displayName.charAt(0).toUpperCase(); p.appendChild(s)
+                    }
+                  }}
+                />
                 : <span className="font-black text-white" style={{ fontSize: "13px" }}>{displayName.charAt(0).toUpperCase()}</span>
               }
             </div>

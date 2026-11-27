@@ -1,4 +1,3 @@
-// hooks/useReports.ts
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -12,21 +11,24 @@ const EMPTY: ReportData = {
     revenueChange: 0, dineIn: 0, takeaway: 0, app: 0,
   },
   charts: {
-    revenueByDay:   [],
-    revenueByWeek:  [],
+    revenueByDay: [],
+    revenueByWeek: [],
     revenueByMonth: [],
-    revenueTrend:   [],
-    categoryData:   [],
-    topItems:       [],
-    paymentData:    [],
+    revenueTrend: [],
+    categoryData: [],
+    topItems: [],
+    paymentData: [],
   },
   recent: [],
+  inventory: {
+    totalProducts: 0, goodStock: 0, lowStock: 0, outStock: 0,
+  },
 }
 
 export function useReports(startDate: string, endDate: string) {
-  const [data, setData]       = useState<ReportData>(EMPTY)
+  const [data, setData] = useState<ReportData>(EMPTY)
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -34,7 +36,7 @@ export function useReports(startDate: string, endDate: string) {
     try {
       const result = await reportsApi.dashboard({
         start_date: startDate || undefined,
-        end_date:   endDate   || undefined,
+        end_date: endDate || undefined,
       })
       setData(result)
     } catch (err: any) {
@@ -50,9 +52,10 @@ export function useReports(startDate: string, endDate: string) {
   return {
     loading,
     error,
-    kpi:     data.kpi,
-    charts:  data.charts,
-    recent:  data.recent,
+    kpi: data.kpi,
+    charts: data.charts,
+    recent: data.recent,
+    inventory: data.inventory,
     refetch: fetchData,
   }
 }

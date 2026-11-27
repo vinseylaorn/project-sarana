@@ -271,7 +271,7 @@ export default function InventoryPage() {
          setIsDialogOpen(false)
          resetDialog()
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "មានបញ្ហា" : "Something went wrong"))
       }
    }
 
@@ -286,7 +286,7 @@ export default function InventoryPage() {
          setIsDeleteAlertOpen(false)
          setItemToDelete(null)
       } catch (err: any) {
-         toastError(err?.message ?? (isKh ? "មិនអាចលុបបាន" : "Failed to delete"))
+         toastError(err?.response?.data?.message ?? err?.message ?? (isKh ? "មិនអាចលុបបាន" : "Failed to delete"))
       }
    }
 
@@ -340,6 +340,17 @@ export default function InventoryPage() {
       if (!nameSearch) return inventory
       return inventory.filter(i => i.name.toLowerCase().includes(nameSearch.toLowerCase()))
    }, [inventory, nameSearch])
+
+   const dateCell = (raw?: string | null) => {
+      const p = formatDateParts(raw)
+      if (!p) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
+      return (
+         <div className="flex flex-col gap-0.5">
+            <span className="text-[14px] text-gray-700 dark:text-white/70">{p.date}</span>
+            <span className="text-[14px] text-gray-600 dark:text-white/30">{p.time}</span>
+         </div>
+      )
+   }
 
    const columns = [
       {
@@ -426,31 +437,13 @@ export default function InventoryPage() {
          key: "created_at",
          header: isKh ? "ថ្ងៃបង្កើត" : "Created At",
          sortable: true,
-         render: (item: InventoryItem) => {
-            const p = formatDateParts(item.created_at)
-            if (!p) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{p.date}</span>
-                  <span className="text-[14px] text-gray-600 dark:text-white/30">{p.time}</span>
-               </div>
-            )
-         },
+         render: (item: InventoryItem) => dateCell(item.created_at),
       },
       {
          key: "updated_at",
          header: isKh ? "បន្ថែមស្តុកចុងក្រោយ" : "Restock At",
          sortable: true,
-         render: (item: InventoryItem) => {
-            const p = formatDateParts(item.updated_at)
-            if (!p) return <span className="text-gray-300 dark:text-white/20 text-[14px]">—</span>
-            return (
-               <div className="flex flex-col gap-0.5">
-                  <span className="text-[14px] text-gray-700 dark:text-white/70">{p.date}</span>
-                  <span className="text-[14px] text-gray-600 dark:text-white/30">{p.time}</span>
-               </div>
-            )
-         },
+         render: (item: InventoryItem) => dateCell(item.updated_at),
       },
       {
          key: "actions",
@@ -620,20 +613,23 @@ export default function InventoryPage() {
                            <RefreshCw className={cn("w-3.5 h-3.5", isFetching && "animate-spin")} />
                         </button>
                      </div>
-                     {can("create") && (
-                        <div className="flex gap-2">
+                     {/* FIX: Add ត្រូវការ create, Re Stock ត្រូវការ edit (ព្រោះវាហៅ PUT) */}
+                     <div className="flex gap-2">
+                        {can("create") && (
                            <button
                               onClick={handleOpenAdd}
                               className="h-9 px-4 flex items-center gap-1.5 rounded-lg text-[14px]  text-white transition-all active:scale-[0.97] bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90" >
                               <Plus className="w-3.5 h-3.5" /> {t("add")}
                            </button>
+                        )}
+                        {can("edit") && (
                            <button
                               onClick={handleOpenRestock}
                               className="h-9 px-4 flex items-center gap-1.5 rounded-lg text-[14px] text-white transition-all active:scale-[0.97] bg-[#03624C] dark:bg-[#1857D8] hover:opacity-90" >
                               <RefreshCw className="w-3.5 h-3.5" /> {isKh ? "បន្ថែមស្តុក" : "Re Stock"}
                            </button>
-                        </div>
-                     )}
+                        )}
+                     </div>
                   </motion.div>
                   <motion.div
                      initial={{ opacity: 0, y: 8 }}
@@ -983,6 +979,17 @@ export default function InventoryPage() {
                            )} >
                            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                            {restockMode && restockItem ? (isKh ? "បន្ថែមស្តុក" : "Restock") : t("save")}
+                        </button>
+                     </div>
+                  </DialogFooter>
+               )}
+               {isViewMode && (
+                  <DialogFooter className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.07] bg-gray-50 dark:bg-[#1e2235] rounded-b-lg">
+                     <div className="flex justify-end w-full">
+                        <button
+                           onClick={() => setIsDialogOpen(false)}
+                           className="h-9 px-5 rounded-lg text-[14px] transition-all border border-gray-200 dark:border-white/[0.10] text-gray-600 dark:text-white/50 hover:bg-gray-100 dark:hover:bg-white/[0.06]" >
+                           {isKh ? "បិទ" : "Close"}
                         </button>
                      </div>
                   </DialogFooter>
